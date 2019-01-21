@@ -3,7 +3,7 @@
 :author: Rene Rivera
 :email: grafikrobot@gmail.com
 :docnumber: P1441
-:revnumber: {docnumber}R0
+:revnumber: {docnumber}R1
 :revdate: {docdate}
 :version-label!:
 :reproducible:
@@ -44,6 +44,10 @@ Audience:: WG21
 Measurements of the performance of building {CPP} modules and relevant comparisons.
 
 == Changes
+
+=== R1
+
+Fix grammatical errors.
 
 === R0 (Initial)
 
@@ -132,7 +136,7 @@ g++ -fmodules-ts -c -O0 m148.cpp
 ==== Non-modular Source
 
 For no-modular source this test simulates the behavior of a build system to
-compile individual all source files in parallel executions of the
+compile individually all source files in parallel executions of the
 compiler to the limit of the available CPU threads. As the non-modular
 sources only depend on already existing header source files all source
 files can be attempted to be compiled at once. The process goes as such:
@@ -192,7 +196,7 @@ processes at once.
 
 Being an experimental compiler the support for compiling modules is fragile and
 placed severe limits on what the modular sources could contain. Most current
-{CPP} construct fail to compile reliably, for example templates, and cause ICEs.
+{CPP} constructs fail to compile reliably, for example templates, and cause ICEs.
 This is why the generated sources only contain `int` variable definitions.
 
 Along that same line the current modular compiler also seems to have stability
@@ -272,10 +276,9 @@ This indicates that as long as we can execute parallel modular compiles at
 the same rate as non-modular compiles it appears that modular compiles have
 a varied but perceptible performance advantage.
 
-This also indicates would indicate that the larger the number of real
-parallel builds possible the less advantage modular compiles have over
-non-modular compiles. This would be something to investigate further with
-more capable hardware.
+This also indicates that the larger the number of real parallel builds
+possible the less advantage modular compiles have over non-modular compiles.
+This would be something to investigate further with more capable hardware.
 
 == Conclusion
 
@@ -289,7 +292,7 @@ source code projects.
 Thanks to Nathan Sidwell for the work to implement the latest merged modules
 proposal in GCC. And the citizens of the Internet and more specifically the
 contributors to StackOverflow for the hints that made it possible to
-decipher how to get the GCC svn checkout build in OSX.
+decipher how to get the GCC svn checkout to build in OSX.
 
 == References
 
