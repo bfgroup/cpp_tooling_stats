@@ -1,0 +1,35 @@
+= C++ Tooling Statistics
+:copyright: Copyright 2019 Rene Rivera
+:author: Rene Rivera
+:email: grafikrobot@gmail.com
+:reproducible:
+:nofooter:
+:sectanchors:
+:sectnums:
+:sectnumlevels: 5
+:source-highlighter: highlightjs
+:source-language: c++
+:toc: left
+:toclevels: 5
+:caution-caption: ⚑
+:important-caption: ‼
+:note-caption: ℹ
+:tip-caption: ☀
+:warning-caption: ⚠
+:CPP: C++
+:PP: ++
+:P: +
+
+Herein we collect and present a variety of performance metrics for {CPP} tools.
+The goal is to illuminate the current state of the {CPP} tooling ecosystem to
+inform future directions for improvements.
+
+== Tests
+
+=== C++ Modules Performance
+
+This is a collection of measurements for building source that uses the
+proposed {CPP} modules feature. So far these are presented as formal
+papers submitted for information to WG21 {CPP} standards group.
+
+* _Are modules fast?_ Rene Rivera -- link:modules/modules_perf_P1441R0.html[P1441R0]

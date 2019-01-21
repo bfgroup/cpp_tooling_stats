@@ -9,3 +9,6 @@ path-constant ROOT : . ;
 
 project cpp_tooling_stats : build-dir .bin ;
 build-project modules ;
+
+html index.html : index.adoc ;
+install html : index.html : <location>. ;
