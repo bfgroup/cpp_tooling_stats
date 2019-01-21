@@ -469,5 +469,8 @@ namespace {id}_ns
         return len(item)+1
 
 
+# P1441R0 modules_perf
+# ./parallel_perf.py --dir=/Users/grafik/devcache/cpp_stats --kind=headers,modules --jobs=8 --dep-max=3 --count=300 --complexity=0.3 --def-ints --dag-depth=3,300
+
 if __name__ == "__main__":
     Test()
