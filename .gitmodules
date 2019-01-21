@@ -1,0 +1,4 @@
+[submodule "std-modules"]
+	path = std-modules
+	url = https://git.build2.org/libstd-modules.git
+	branch = master
