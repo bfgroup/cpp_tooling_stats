@@ -1,0 +1,3 @@
+= C++ Tooling Statistics
+
+Herein we collect and present a variety of performance metrics for C++ tools. The goal is to illuminate the current state of the C++ tooling ecosystem to inform future directions for improvements.
