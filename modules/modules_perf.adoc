@@ -2,7 +2,7 @@
 :copyright: Copyright 2019 Rene Rivera
 :author: Rene Rivera
 :email: grafikrobot@gmail.com
-:docnumber: P1441
+:docnumber: D1441
 :revnumber: {docnumber}R1
 :revdate: {docdate}
 :version-label!:
@@ -47,7 +47,8 @@ Measurements of the performance of building {CPP} modules and relevant compariso
 
 === R1
 
-Fix grammatical errors.
+Fix grammatical errors. Additional data of parallel building from higher thread
+and faster hardware, thanks to Robert Maynard for running the tests.
 
 === R0 (Initial)
 
@@ -58,7 +59,7 @@ implementation (rev 268043, 2019-01-17 10:58:47 -0600 (Thu, 17 Jan 2019)) .
 
 One of the stated goals of the modules proposals was performance over existing
 non-modular source specifically in terms of scalable builds. This paper aims to
-answer the important question of wether that goal was achieved by current
+answer the important question of whether that goal was achieved by current
 modules implementations.
 
 Building software does not happen in the solitude of the C++ compiler. It is
@@ -215,36 +216,61 @@ discovery while building and in the face of generated source files.
 === Results
 
 ++++
-<div id="parallel_build" style="height: 500px;"></div>
 <script type="text/javascript">
-var parallel_build_chart = echarts.init(document.getElementById('parallel_build'));
-parallel_build_chart.setOption({
-    legend: {
-        data:['Non-Modular', 'Modular']
-    },
-    tooltip: {
-        trigger: 'axis',
-        axisPointer: {
-            type: 'shadow'
-        }
-    },
-    xAxis: [ { name: 'DAG Depth', type: 'category' } ],
-    yAxis: [ { name: 'Wall Clock Seconds', type: 'value' } ],
-    series: [
-        {
-            name: 'Non-Modular',
-            type: 'bar',
-            label: { normal: { show: true, position: 'top', rotate: 90, align: 'left', verticalAlign: 'middle' } },
-            encode: { x: 'dag_depth', y: 'headers' },
+function parallel_build_value_fmt(v) {
+    return Number.parseFloat(v).toFixed(1).toString();
+}
+function create_parallel_build_chart(target, title, data) {
+    var chart = echarts.init(document.getElementById(target));
+    chart.setOption({
+        title: title,
+        legend: { data:['Non-Modular', 'Modular'] },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' }
         },
-        {
-            name: 'Modular',
-            type: 'bar',
-            label: { normal: { show: true, position: 'top', rotate: 90, align: 'left', verticalAlign: 'middle' } },
-            encode: { x: 'dag_depth', y: 'modules' },
-        },
-    ],
-    dataset: { source:
+        xAxis: [ { name: 'DAG Depth', type: 'category', nameLocation: 'center', nameGap: 30 } ],
+        yAxis: [ { name: 'Wall Clock Seconds', type: 'value', nameLocation: 'center', nameGap: 45 } ],
+        series: [
+            {
+                name: 'Non-Modular',
+                type: 'bar',
+                // type: 'pictorialBar', symbol: 'rect',
+                label: { normal: {
+                    show: true, position: 'top', rotate: 90,
+                    align: 'left', verticalAlign: 'middle',
+                    formatter: function (params) { return parallel_build_value_fmt(params.value[1]); }
+                } },
+                encode: { x: 'dag_depth', y: 'headers' },
+            },
+            {
+                name: 'Modular',
+                type: 'bar',
+                // type: 'pictorialBar', symbol: 'roundRect', symbolRepeat: true, symbolSize: ['100%', 5], barGap: '0%',
+                label: { normal: {
+                    show: true, position: 'top', rotate: 90,
+                    align: 'left', verticalAlign: 'middle',
+                    formatter: function (params) { return parallel_build_value_fmt(params.value[2]); }
+                } },
+                encode: { x: 'dag_depth', y: 'modules' },
+                formatter: parallel_build_value_fmt,
+            },
+        ],
+        dataset: { source: data }
+    });
+}
+</script>
+++++
+
+++++
+<div id="parallel_build" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build',
+{
+    text: 'Jobs: 8',
+    subtext: 'Coqui: Intel Mobile Core i7 "Haswell/Crystalwell" (I7-4870HQ) @ 2.5GHz (4 physical cores / 8 threads)'
+},
 [["dag_depth", "headers", "modules"],
  [3, 4.20, 4.03],
  [32, 17.67, 7.25],
@@ -258,8 +284,7 @@ parallel_build_chart.setOption({
  [264, 16.80, 36.04],
  [293, 18.89, 36.10],
 ]
-    }
-});
+);
 </script>
 ++++
 
@@ -278,14 +303,213 @@ a varied but perceptible performance advantage.
 
 This also indicates that the larger the number of real parallel builds
 possible the less advantage modular compiles have over non-modular compiles.
-This would be something to investigate further with more capable hardware.
+
+In the next run we see what using a faster processor does to the differential
+of the two builds. First it's an equivalent 8 job run.
+
+++++
+<div id="parallel_build_forge_8" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_forge_8',
+{
+    text: 'Jobs: 8',
+    subtext: 'Forge: Intel Xeon W-2145 CPU @ 3.70GHz (8 physical cores / 16 w HT)'
+},
+[["dag_depth", "headers", "modules"],
+[3, 1.0087610629852861, 0.9181149080395699],
+[32, 6.219321154989302, 3.495909297140315],
+[61, 6.822150422027335, 8.447206597076729],
+[90, 6.62159296288155, 11.705184109974653],
+[119, 7.020121752982959, 16.304624445037916],
+[148, 6.218935227021575, 15.99679002398625],
+[177, 6.920910760993138, 31.80375639302656],
+[206, 6.7199871190823615, 31.809441711986437],
+[235, 7.019685101928189, 32.10625554807484],
+[264, 7.523170454893261, 32.21603080490604],
+[293, 7.421268946025521, 32.819102976005524],
+]
+);
+</script>
+++++
+
+As we can see the difference is now substantially smaller between non-modular
+and modular. And the modular build looses it's advantage at a much shorter
+DAG depth. We now see data for ever increasing parallel job executions. First
+on the same machine but using the extra CPU threads.
+
+++++
+<div id="parallel_build_forge_16" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_forge_16',
+{
+    text: 'Jobs: 16',
+    subtext: 'Forge: Intel Xeon W-2145 CPU @ 3.70GHz (8 physical cores / 16 w HT)'
+},
+[["dag_depth", "headers", "modules"],
+[3, 0.7142633509356529, 0.6305585629306734],
+[32, 4.42658746894449, 3.6445175728295],
+[61, 5.120990126160905, 8.498418937902898],
+[90, 4.320516403997317, 11.56579358316958],
+[119, 4.519910953938961, 16.905501161934808],
+[148, 5.923867805162445, 16.80855169799179],
+[177, 5.122375542065129, 34.02343076188117],
+[206, 4.521708729909733, 33.73796621104702],
+[235, 5.422818426974118, 33.539066845783964],
+[264, 5.722841507988051, 33.93446898995899],
+[293, 4.9209292840678245, 34.26832155906595],
+]
+);
+</script>
+++++
+
+And following with a slower machine but with more threads available. In which
+we see almost no advantage of the modular build over the non-modular build.
+
+++++
+<div id="parallel_build_adora_20" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_adora_20',
+{
+    text: 'Jobs: 20',
+    subtext: 'Adora: Intel Xeon CPU E5-2640 v4 @ 2.40GHz(Dual Socket 20 physical cores / 40 w HT)'
+},
+[["dag_depth", "headers", "modules"],
+[3, 0.8324654409661889, 0.7814998480025679],
+[32, 3.6408212459646165, 4.337540799053386],
+[61, 3.8346789749339223, 9.880849721026607],
+[90, 3.7342746899230406, 13.396270678029396],
+[119, 4.135533166001551, 20.20463444001507],
+[148, 3.9350876439129934, 20.0246805800125],
+[177, 3.738359506940469, 40.21712113998365],
+[206, 3.735614522942342, 39.99239156895783],
+[235, 4.337132448912598, 39.88247996591963],
+[264, 4.035582971991971, 39.84508032305166],
+[293, 4.437921910895966, 40.12975517997984],
+]
+);
+</script>
+++++
+
+At this point we have enough available threads that the non-modular build is
+always faster than the modular one.
+
+++++
+<div id="parallel_build_adora_40" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_adora_40',
+{
+    text: 'Jobs: 40',
+    subtext: 'Adora: Intel Xeon CPU E5-2640 v4 @ 2.40GHz(Dual Socket 20 physical cores / 40 w HT)'
+},
+[["dag_depth", "headers", "modules"],
+[3, 0.5466072140261531, 0.7457621870562434],
+[32, 2.660381791065447, 5.159351971000433],
+[61, 2.8620165209285915, 12.021816556924023],
+[90, 2.6592831240268424, 16.095812772982754],
+[119, 3.071641996037215, 24.11021802900359],
+[148, 2.7618402070365846, 24.295514196972363],
+[177, 2.96113809698727, 48.567696807091124],
+[206, 2.960873455973342, 48.52055719902273],
+[235, 2.959431970026344, 48.238920859992504],
+[264, 2.7622248779516667, 48.05883625894785],
+[293, 2.8615603980142623, 48.27250578906387],
+]
+);
+</script>
+++++
+
+And finally, as the CPU speed goes lower but the threads goes up the difference
+between the two builds is readily apparent. With modular builds loosing
+at all levels.
+
+++++
+<div id="parallel_build_camelot_68" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_camelot_68',
+{
+    text: 'Jobs: 68',
+    subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
+},
+[["dag_depth", "headers", "modules"],
+[3, 1.7595279880333692, 2.1799887949600816],
+[32, 8.06883534498047, 18.5961584339384],
+[61, 9.096224897075444, 42.67319647106342],
+[90, 9.611890556057915, 56.74518109404016],
+[119, 9.153583665029146, 85.26279399089981],
+[148, 7.369923300924711, 85.27267788292374],
+[177, 8.252392338006757, 170.98840467899572],
+[206, 9.793684736941941, 170.75660639989655],
+[235, 10.23349713603966, 170.82041397399735],
+[264, 9.471675020991825, 171.1151053160429],
+[293, 9.702734051970765, 170.9213510870468],
+]
+);
+</script>
+++++
+
+++++
+<div id="parallel_build_camelot_136" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_camelot_136',
+{
+    text: 'Jobs: 136',
+    subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
+},
+[["dag_depth", "headers", "modules"],
+[3, 2.0307430600514635, 3.4948218159843236],
+[32, 6.0405289239715785, 35.49258812505286],
+[61, 6.764967894996516, 81.36800942802802],
+[90, 6.280745088937692, 109.36394645192195],
+[119, 6.335177005967125, 163.58082887192722],
+[148, 6.615980034926906, 163.45939861994702],
+[177, 7.076706105028279, 328.559180035023],
+[206, 6.492715556989424, 328.74980488594156],
+[235, 7.19850400602445, 327.94702022802085],
+[264, 6.596547717927024, 328.61911632702686],
+[293, 6.832825995050371, 328.309868671],
+]
+);
+</script>
+++++
+
+++++
+<div id="parallel_build_camelot_272" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_camelot_272',
+{
+    text: 'Jobs: 272',
+    subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
+},
+[["dag_depth", "headers", "modules"],
+[3, 3.4972561289323494, 8.472751475055702],
+[32, 7.411651192000136, 96.71444478898775],
+[61, 7.176073360955343, 222.80584899999667],
+[90, 7.527861946960911, 300.56390088098124],
+[119, 7.30671163299121, 447.55594796303194],
+[148, 8.037210080889054, 449.50167113903444],
+[177, 7.704545061104, 900.5817094079684],
+[206, 7.564260617014952, 898.9721814970253],
+[235, 7.595040827989578, 906.8235456779366],
+[264, 7.5456773799378425, 907.7898443009472],
+[293, 6.927266972954385, 899.7880558320321],
+]
+);
+</script>
+++++
 
 == Conclusion
 
-With the limitations of the sampling currently possible the best we can
-conclude is that there are some possible gains in modular compilation
-but that the gains might not be attainable for really large and complex
-source code projects.
+With the limitations of the capabilities of the compiler wen can only conclude
+that modular builds could be advantageous only for slower and low parallelism
+environments. In other words, that modules currently do not scale in the same
+ways as traditional compilation.
 
 == Acknowledgements
 
@@ -293,6 +517,9 @@ Thanks to Nathan Sidwell for the work to implement the latest merged modules
 proposal in GCC. And the citizens of the Internet and more specifically the
 contributors to StackOverflow for the hints that made it possible to
 decipher how to get the GCC svn checkout to build in OSX.
+
+Special thanks to Robert Maynard for taking the time and resources to build
+GCC and run the test script on various machine configurations and job counts.
 
 == References
 
