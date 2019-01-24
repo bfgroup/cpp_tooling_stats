@@ -506,7 +506,7 @@ var parallel_build_chart = create_parallel_build_chart(
 
 == Conclusion
 
-With the limitations of the capabilities of the compiler wen can only conclude
+With the limitations of the capabilities of the compiler one can only conclude
 that modular builds could be advantageous only for slower and low parallelism
 environments. In other words, that modules currently do not scale in the same
 ways as traditional compilation.
