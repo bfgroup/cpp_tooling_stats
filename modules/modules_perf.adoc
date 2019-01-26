@@ -188,7 +188,7 @@ g++ -c -O0 h148.cpp
 === Limitations
 
 This test has some real-life limitations borne out of the software and hardware
-used for testing. Some of these limitations where discovered through
+used for testing. Some of these limitations were discovered through
 experimentation, for example with internal compiler errors.
 
 The current test hardware is an OSX laptop with an Intel 4 core and 8 thread CPU.
@@ -422,9 +422,9 @@ var parallel_build_chart = create_parallel_build_chart(
 </script>
 ++++
 
-And finally, as the CPU speed goes lower but the threads goes up the difference
-between the two builds is readily apparent. With modular builds loosing
-at all levels.
+This final set of results should be considered in the context that the machine
+running the tests is not ideally designed for this kind of workload. But as
+such it does highlight the imbalance between parallelism and CPU speed.
 
 ++++
 <div id="parallel_build_camelot_68" style="height: 400px;"></div>
