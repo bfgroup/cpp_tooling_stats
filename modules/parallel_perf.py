@@ -102,20 +102,43 @@ class PushDir():
 
 class Test(Main):
     def __init_parser__(self, parser):
-        parser.add_argument('--kind', required=True)
-        parser.add_argument('--dir', required=True)
-        parser.add_argument('--count', default=10)
-        parser.add_argument('--complexity', default=1)
-        parser.add_argument('--size', default=0)
-        parser.add_argument('--dag-depth', default='3,3')
-        parser.add_argument('--dep-factor', default=1.0)
-        parser.add_argument('--dep-max', default=4)
-        parser.add_argument('--jobs', default=2)
-        parser.add_argument('--use-std', default=False, action='store_true')
         parser.add_argument(
-            '--def-templates', default=False, action='store_true')
+            '--kind', required=True,
+            help='The type of test to run. Can be one of: headers, modules.')
         parser.add_argument(
-            '--def-ints', default=False, action='store_true')
+            '--dir', required=True,
+            help='The directory root to generate the test files.')
+        parser.add_argument(
+            '--count', default=10, type=int,
+            help='Number of TUs to generate and process.')
+        parser.add_argument(
+            '--complexity', default=1, type=float,
+            help='Complexity of generated code in each TU from 0 to 1, where 1 is most complex.')
+        # parser.add_argument('--size', default=0)
+        parser.add_argument(
+            '--dag-depth', default='3,3',
+            help='The range of DAG depths to test as two comma separated values.')
+        parser.add_argument(
+            '--dep-factor', default=1.0,
+            help='Ratio of dependencies from the TUs in one DAG depth to the previous TUs.')
+        parser.add_argument(
+            '--dep-max', default=4,
+            help='Maximum number of generated dependencies in source files.')
+        parser.add_argument(
+            '--jobs', default=2,
+            help='Maximum number of parallel jobs to use.')
+        parser.add_argument(
+            '--use-std', default=False, action='store_true',
+            help='Generate references to standard library in the source.')
+        parser.add_argument(
+            '--def-templates', default=False, action='store_true',
+            help='Generate test template definitions in the source.')
+        parser.add_argument(
+            '--def-ints', default=False, action='store_true',
+            help='Generate integer variable declarations in the source.')
+        parser.add_argument(
+            '--json-out', required=True,
+            help='Output resulting test data table as JSON to a file.')
 
     def __run__(self):
         self.dir = os.getcwd()
@@ -134,15 +157,16 @@ class Test(Main):
             sample = self.__test__()
             data.append(sample)
             pprint.pprint(sample)
-        print('[["dag_depth", "headers", "modules"],')
+        pprint.pprint(data)
+        json_data = [["dag_depth", "headers", "modules"]]
         for d in data:
-            print(' [%s, %s, %s],' %(
+            json_data.append([
                 d['dag_depth'],
                 d['headers'],
                 d['modules']
-            ))
-        print(']')
-        pprint.pprint(data)
+            ])
+        if self.args.json_out:
+            self.__save_data__(self.args.json_out, json_data)
 
     def __test__(self):
         args_dir = self.args.dir
