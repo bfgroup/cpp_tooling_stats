@@ -8,6 +8,7 @@ export CXX=${CXX:=g++}
 PREFIX=`pwd`
 ROOT=${PREFIX}/__build__
 export TEMP=${PREFIX}/__temp__
+export LD_LIBRARY_PATH=${PREFIX}/lib
 
 set -e
 mkdir -p ${ROOT}
