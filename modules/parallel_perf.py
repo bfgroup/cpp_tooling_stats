@@ -303,13 +303,16 @@ class Test(Main):
                         f.write(module_source)
         return modules_levels
 
-    def __test_modules__(self, modules_levels):
+    def __test_modules__(self, levels):
         if self.args.trace:
             print('MODULES_LEVELS:')
-            pprint.pprint(modules_levels)
-        for modules_level in modules_levels:
-            with multiprocessing.Pool(processes=int(self.args.jobs)) as pool:
-                pool.map(self.__compile_module__, modules_level)
+            pprint.pprint(levels)
+        for level in levels:
+            pool = multiprocessing.Pool(processes=int(self.args.jobs))
+            pool.map(__Test_compile_modules_function__,
+                     [(self, m) for m in level])
+            pool.close()
+            pool.join()
 
     # CXX -fmodules-ts m0.cpp -c -O0
     def __compile_module__(self, m):
@@ -406,7 +409,8 @@ import {id};
             pprint.pprint(levels)
         for level in levels:
             pool = multiprocessing.Pool(processes=int(self.args.jobs))
-            pool.map(self.__compile_headers__, level)
+            pool.map(__Test_compile_headers_function__,
+                     [(self, m) for m in level])
             pool.close()
             pool.join()
 
@@ -510,6 +514,14 @@ namespace {id}_ns
     def __append__(container, item):
         container.append(item)
         return len(item)+1
+
+
+def __Test_compile_headers_function__(m):
+    m[0].__compile_headers__(m[1])
+
+
+def __Test_compile_modules_function__(m):
+    m[0].__compile_module__(m[1])
 
 
 # P1441R0 modules_perf
