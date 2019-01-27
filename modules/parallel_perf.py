@@ -210,11 +210,11 @@ class Test(Main):
         if self.args.use_std:
             if self.args.kind == 'headers':
                 l = roundi(float(self.args.complexity)
-                          * len(self.__std_includes__))
+                           * len(self.__std_includes__))
                 return self.__std_includes__[0:l]
             elif self.args.kind == 'modules':
                 l = roundi(float(self.args.complexity)
-                          * len(self.__std_imports__))
+                           * len(self.__std_imports__))
                 return self.__std_imports__[0:l]
         else:
             return []
@@ -236,6 +236,18 @@ class Test(Main):
                 result.append(
                     '''{export} template <typename T> struct s{id} {{ typedef typename s{id_base}<T>::t t; }};'''.format(
                         id=i+1, id_base=i, export=export))
+        return result
+
+    @property
+    def cxx(self):
+        result = os.getenv('CXX')
+        if not result and os.path.isfile('/Developer/Tools/gcc-modules/bin/g++-mxx'):
+            result = '/Developer/Tools/gcc-modules/bin/g++-mxx'
+        if not result and os.path.isfile(os.path.join(os.getenv('HOME'), 'gcc-modules', 'bin', 'g++-mxx')):
+            result = os.path.isfile(os.path.join(
+                os.getenv('HOME'), 'gcc-modules', 'bin', 'g++-mxx'))
+        if not result:
+            result = 'g++-mxx'
         return result
 
     # MODULES...
@@ -299,11 +311,11 @@ class Test(Main):
             with multiprocessing.Pool(processes=int(self.args.jobs)) as pool:
                 pool.map(self.__compile_module__, modules_level)
 
-    # /Developer/Tools/gcc-modules/bin/g++-mxx -fmodules-ts m0.cpp -c -O0
+    # CXX -fmodules-ts m0.cpp -c -O0
     def __compile_module__(self, m):
         with PushDir(os.path.dirname(m)):
             cc = [
-                '/Developer/Tools/gcc-modules/bin/g++-mxx',
+                self.cxx,
                 '-fmodules-ts', '-c', '-O0',
                 os.path.basename(m)]
             if self.args.use_std:
@@ -398,11 +410,11 @@ import {id};
             pool.close()
             pool.join()
 
-    # /Developer/Tools/gcc-modules/bin/g++-mxx m0.cpp -c -O0
+    # CXX m0.cpp -c -O0
     def __compile_headers__(self, m):
         with PushDir(os.path.dirname(m)):
             cc = [
-                '/Developer/Tools/gcc-modules/bin/g++-mxx',
+                self.cxx,
                 '-c', '-O0',
                 os.path.basename(m)
             ]
