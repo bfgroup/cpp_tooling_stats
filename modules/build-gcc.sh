@@ -1,18 +1,18 @@
 #!/bin/sh
 
-JOBS=8
+export JOBS=${JOBS:=8}
+export CC=${CC:=gcc}
+export CXX=${CXX:=g++}
+
+
 PREFIX=`pwd`
 ROOT=${PREFIX}/__build__
-
 export TEMP=${PREFIX}/__temp__
 
 set -e
 mkdir -p ${ROOT}
 pushd ${ROOT}
 mkdir -p ${TEMP}
-
-export CC=gcc-7
-export CXX=g++-7
 
 rm -rf include lib share
 
@@ -65,7 +65,6 @@ rm -rf isl-0.18
 rm -rf gcc-svn
 svn co "svn://gcc.gnu.org/svn/gcc/branches/c++-modules" gcc-svn
 pushd gcc-svn
-svn up
 rm -rf __build__
 mkdir __build__
 cd __build__
