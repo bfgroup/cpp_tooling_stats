@@ -312,9 +312,9 @@ class Test(Main):
                 sleep(random.uniform(0.0, 0.1))
                 print('C++: "%s"' % ('" "'.join(cc)))
             else:
-                t0 = perf_counter()
+                t0 = default_timer()
                 self.__check_call__(cc)
-                t1 = perf_counter()
+                t1 = default_timer()
                 if self.args.trace:
                     print('C++: "%s" => %s' % ('" "'.join(cc), t1-t0))
 
@@ -410,9 +410,9 @@ import {id};
                 sleep(random.uniform(0.0, 0.1))
                 print('C++: "%s"' % ('" "'.join(cc)))
             else:
-                t0 = perf_counter()
+                t0 = default_timer()
                 self.__check_call__(cc)
-                t1 = perf_counter()
+                t1 = default_timer()
                 if self.args.trace:
                     print('C++: "%s" => %s' % ('" "'.join(cc), t1-t0))
 
