@@ -393,8 +393,10 @@ import {id};
             print('LEVELS:')
             pprint.pprint(levels)
         for level in levels:
-            with multiprocessing.Pool(processes=int(self.args.jobs)) as pool:
-                pool.map(self.__compile_headers__, level)
+            pool = multiprocessing.Pool(processes=int(self.args.jobs))
+            pool.map(self.__compile_headers__, level)
+            pool.close()
+            pool.join()
 
     # /Developer/Tools/gcc-modules/bin/g++-mxx m0.cpp -c -O0
     def __compile_headers__(self, m):
