@@ -15,7 +15,12 @@ import random
 import re
 import shutil
 from subprocess import check_call, call, check_output
-from time import sleep, perf_counter
+from time import sleep
+from timeit import default_timer
+
+
+def roundi(f):
+    return int(round(f))
 
 
 class Commands():
@@ -183,9 +188,9 @@ class Test(Main):
                 if gen_x:
                     x = gen_x()
                     if test_x:
-                        t0 = perf_counter()
+                        t0 = default_timer()
                         test_x(x)
-                        t1 = perf_counter()
+                        t1 = default_timer()
                         print(t1-t0)
                         result[kind] = t1-t0
         return result
@@ -204,11 +209,11 @@ class Test(Main):
     def std_includes(self):
         if self.args.use_std:
             if self.args.kind == 'headers':
-                l = round(float(self.args.complexity)
+                l = roundi(float(self.args.complexity)
                           * len(self.__std_includes__))
                 return self.__std_includes__[0:l]
             elif self.args.kind == 'modules':
-                l = round(float(self.args.complexity)
+                l = roundi(float(self.args.complexity)
                           * len(self.__std_imports__))
                 return self.__std_imports__[0:l]
         else:
@@ -219,7 +224,7 @@ class Test(Main):
         result = []
         export = 'export' if self.args.kind == 'modules' else ''
         if self.args.def_ints:
-            for i in range(round(float(self.args.complexity)*1000)):
+            for i in range(roundi(float(self.args.complexity)*1000)):
                 result.append(
                     '''{export} int i{id} = {id};'''.format(
                         id=i+1, export=export))
@@ -227,7 +232,7 @@ class Test(Main):
             result.append(
                 '''{export} template <typename T> struct s0 {{ enum t {{ a }}; }};'''.format(
                     export=export))
-            for i in range(round(float(self.args.complexity)*1000)):
+            for i in range(roundi(float(self.args.complexity)*1000)):
                 result.append(
                     '''{export} template <typename T> struct s{id} {{ typedef typename s{id_base}<T>::t t; }};'''.format(
                         id=i+1, id_base=i, export=export))
@@ -462,7 +467,7 @@ namespace {id}_ns
             if j+(int(dag_step)/2) > int(self.args.count):
                 j = int(self.args.count)
             dag_dep_count = min(
-                round(self.args.dep_factor*j), int(self.args.dep_max))
+                roundi(self.args.dep_factor*j), int(self.args.dep_max))
             dag_level = []
             for m in range(int(i), int(j)):
                 dep_count = min(dag_dep_count, len(dag_deps))
