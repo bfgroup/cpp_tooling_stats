@@ -4,9 +4,12 @@ JOBS=8
 PREFIX=`pwd`
 ROOT=${PREFIX}/__build__
 
+export TEMP=${PREFIX}/__temp__
+
 set -e
-mkdir -p ${BUILD}
-pushd ${BUILD}
+mkdir -p ${ROOT}
+pushd ${ROOT}
+mkdir -p ${TEMP}
 
 export CC=gcc-7
 export CXX=g++-7
@@ -18,10 +21,10 @@ ln -s /usr/bin/true makeinfo
 export PATH=${PWD}:${PATH}
 export MAKEINFO=true
 rm -rf gmp-6.1.0 mpfr-3.1.4 mpc-1.0.3 isl-0.18
-curl -L ftp://gcc.gnu.org/pub/gcc/infrastructure/gmp-6.1.0.tar.bz2 | tar xf -
-curl -L ftp://gcc.gnu.org/pub/gcc/infrastructure/mpfr-3.1.4.tar.bz2 | tar xf -
-curl -L ftp://gcc.gnu.org/pub/gcc/infrastructure/mpc-1.0.3.tar.gz | tar xf -
-curl -L ftp://gcc.gnu.org/pub/gcc/infrastructure/isl-0.18.tar.bz2 | tar xf -
+curl -L ftp://gcc.gnu.org/pub/gcc/infrastructure/gmp-6.1.0.tar.bz2 | tar xfj -
+curl -L ftp://gcc.gnu.org/pub/gcc/infrastructure/mpfr-3.1.4.tar.bz2 | tar xfj -
+curl -L ftp://gcc.gnu.org/pub/gcc/infrastructure/mpc-1.0.3.tar.gz | tar xfz -
+curl -L ftp://gcc.gnu.org/pub/gcc/infrastructure/isl-0.18.tar.bz2 | tar xfj -
 
 pushd gmp-6.1.0
 mkdir __build__
@@ -60,7 +63,7 @@ popd
 rm -rf isl-0.18
 
 rm -rf gcc-svn
-svn co svn://gcc.gnu.org/svn/gcc/branches/c++-modules gcc-svn
+svn co "svn://gcc.gnu.org/svn/gcc/branches/c++-modules" gcc-svn
 pushd gcc-svn
 svn up
 rm -rf __build__
