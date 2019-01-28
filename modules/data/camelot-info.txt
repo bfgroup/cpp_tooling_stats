@@ -1,0 +1,6 @@
+Camelot:
+- Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)
+-- NUMA domain setup as quad mode
+-- HBM is setup as 'cache' mode
+- 102GB ECC
+- HD unknown

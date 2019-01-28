@@ -1,0 +1,4 @@
+Forge:
+- Intel Xeon W-2145 CPU @ 3.70GHz (8 physcial cores / 16 w HT)
+- 64GB ECC. 4x16GB 2666hz DDR4
+- LITEON CA3-8D256 NVMe 256GB

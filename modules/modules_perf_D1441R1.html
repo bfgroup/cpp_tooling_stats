@@ -439,7 +439,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <span id="author" class="author">Rene Rivera</span><br>
 <span id="email" class="email"><a href="mailto:grafikrobot@gmail.com">grafikrobot@gmail.com</a></span><br>
 <span id="revnumber"> D1441R1,</span>
-<span id="revdate">2019-01-26</span>
+<span id="revdate">2019-01-27</span>
 </div>
 <div id="toc" class="toc2">
 <div id="toctitle">Table of Contents</div>
@@ -537,7 +537,7 @@ Document number
 Date
 </td>
 <td class="hdlist2">
-<p>2019-01-26</p>
+<p>2019-01-27</p>
 </td>
 </tr>
 <tr>
@@ -574,7 +574,8 @@ Audience
 <div class="sect2">
 <h3 id="_r1"><a class="anchor" href="#_r1"></a>2.1. R1</h3>
 <div class="paragraph">
-<p>Fix grammatical errors. Additional data of parallel building from higher thread
+<p>Fix grammatical errors. Ran tests on a high CPU machine from the GCC Farm
+Project. Additional data of parallel building from higher thread
 and faster hardware, thanks to Robert Maynard for running the tests.</p>
 </div>
 </div>
@@ -969,6 +970,232 @@ var parallel_build_chart = create_parallel_build_chart(
 ]
 );
 </script>
+<div class="paragraph">
+<p>Changing pace we now look at a higher range of CPU threads on a different
+architecture. For this series of results we go from 32 to 128 parallel
+compiles possible.</p>
+</div>
+<div id="parallel_build_gcc135_32" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_gcc135_32',
+{
+    text: 'Jobs: 32',
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
+},
+[
+  [
+    "dag_depth",
+    "headers",
+    "modules"
+  ],
+  [
+    3,
+    1.1499571800231934,
+    0.800645112991333
+  ],
+  [
+    32,
+    6.475100040435791,
+    4.410186052322388
+  ],
+  [
+    61,
+    7.7858898639678955,
+    10.05051302909851
+  ],
+  [
+    90,
+    6.986098051071167,
+    13.42789912223816
+  ],
+  [
+    119,
+    6.474509000778198,
+    20.13845705986023
+  ],
+  [
+    148,
+    6.480724096298218,
+    20.150399923324585
+  ],
+  [
+    177,
+    6.173375844955444,
+    40.364349126815796
+  ],
+  [
+    206,
+    7.376609802246094,
+    40.40149402618408
+  ],
+  [
+    235,
+    7.18256402015686,
+    40.460439920425415
+  ],
+  [
+    264,
+    7.583168983459473,
+    40.54068684577942
+  ],
+  [
+    293,
+    5.7687811851501465,
+    40.627676010131836
+  ]
+]
+);
+</script>
+<div id="parallel_build_gcc135_64" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_gcc135_64',
+{
+    text: 'Jobs: 64',
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
+},
+[
+  [
+    "dag_depth",
+    "headers",
+    "modules"
+  ],
+  [
+    3,
+    0.7993950843811035,
+    0.833683967590332
+  ],
+  [
+    32,
+    4.9682300090789795,
+    5.849884033203125
+  ],
+  [
+    61,
+    4.963599920272827,
+    13.247076988220215
+  ],
+  [
+    90,
+    4.954469919204712,
+    17.50671100616455
+  ],
+  [
+    119,
+    5.480782985687256,
+    26.25961399078369
+  ],
+  [
+    148,
+    5.371126890182495,
+    26.13917899131775
+  ],
+  [
+    177,
+    5.038439989089966,
+    52.716537952423096
+  ],
+  [
+    206,
+    4.945017099380493,
+    52.78184700012207
+  ],
+  [
+    235,
+    4.558218955993652,
+    52.748005867004395
+  ],
+  [
+    264,
+    5.747392177581787,
+    52.87318706512451
+  ],
+  [
+    293,
+    6.054435968399048,
+    52.93238115310669
+  ]
+]
+);
+</script>
+<div id="parallel_build_gcc135_128" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_gcc135_128',
+{
+    text: 'Jobs: 128',
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
+},
+[
+  [
+    "dag_depth",
+    "headers",
+    "modules"
+  ],
+  [
+    3,
+    0.5676569938659668,
+    0.8597321510314941
+  ],
+  [
+    32,
+    2.785491943359375,
+    9.304991960525513
+  ],
+  [
+    61,
+    3.186284065246582,
+    20.853742122650146
+  ],
+  [
+    90,
+    3.286099910736084,
+    27.837176084518433
+  ],
+  [
+    119,
+    3.290584087371826,
+    41.82184100151062
+  ],
+  [
+    148,
+    3.3075339794158936,
+    41.81191802024841
+  ],
+  [
+    177,
+    3.2852180004119873,
+    84.24899697303772
+  ],
+  [
+    206,
+    3.102052927017212,
+    84.27340197563171
+  ],
+  [
+    235,
+    3.1731510162353516,
+    84.180330991745
+  ],
+  [
+    264,
+    3.2779219150543213,
+    84.43389201164246
+  ],
+  [
+    293,
+    3.4889698028564453,
+    84.91905903816223
+  ]
+]
+);
+</script>
+<div class="paragraph">
+<p>As we can see the same trend continues and the differences between modular
+and non-modular are heightened. The higher the number of parallel compiles
+the less of an advantage modular appears.</p>
+</div>
 <div class="paragraph">
 <p>This final set of results should be considered in the context that the machine
 running the tests is not ideally designed for this kind of workload. But as
