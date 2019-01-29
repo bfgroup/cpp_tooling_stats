@@ -556,5 +556,8 @@ def __pool_function__(x):
 # P1441R0 modules_perf
 # ./parallel_perf.py --dir=/Users/grafik/devcache/cpp_stats --kind=headers,modules --jobs=8 --dep-max=3 --count=300 --complexity=0.3 --def-ints --dag-depth=3,300
 
+# D1441R1
+# ./parallel_perf.py --dir=/Users/grafik/devcache/cpp_stats --def-ints --dag-depth=1,151 --json-out=data.json --jobs=8
+
 if __name__ == "__main__":
     Test()
