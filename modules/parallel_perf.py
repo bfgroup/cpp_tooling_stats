@@ -108,6 +108,9 @@ class PushDir():
 class Test(Main):
     def __init_parser__(self, parser):
         parser.add_argument(
+            '--test', default='build',
+            help='The test to run. Can be one of: build.')
+        parser.add_argument(
             '--kind', required=True,
             help='The type of test to run. Can be one of: headers, modules.')
         parser.add_argument(
@@ -119,7 +122,6 @@ class Test(Main):
         parser.add_argument(
             '--complexity', default=1, type=float,
             help='Complexity of generated code in each TU from 0 to 1, where 1 is most complex.')
-        # parser.add_argument('--size', default=0)
         parser.add_argument(
             '--dag-depth', default='3,3',
             help='The range of DAG depths to test as two comma separated values.')
@@ -156,10 +158,11 @@ class Test(Main):
         dag_depth_range = range(
             args_dag_depth[0], args_dag_depth[1],
             max([1, int((args_dag_depth[1]-args_dag_depth[0])/10)]))
+        test_x = getattr(self, '__test_%s__' % (self.args.test), False)
         for dag_depth in dag_depth_range:
             self.args.dag_depth = dag_depth
             self.args.kind = args_kind
-            sample = self.__test__()
+            sample = test_x()
             data.append(sample)
             pprint.pprint(sample)
         pprint.pprint(data)
@@ -173,7 +176,7 @@ class Test(Main):
         if self.args.json_out:
             self.__save_data__(self.args.json_out, json_data)
 
-    def __test__(self):
+    def __test_build__(self):
         args_dir = self.args.dir
         result = {
             'dag_depth': self.args.dag_depth
@@ -183,13 +186,13 @@ class Test(Main):
                 self.args.kind = kind
                 print("KIND: %s" % (kind))
                 gen_x = getattr(self, '__generate_%s__' % (kind), False)
-                test_x = getattr(self, '__test_%s__' % (kind), False)
+                run_x = getattr(self, '__run_%s__' % (kind), False)
                 self.args.dir = os.path.join(args_dir, kind)
                 if gen_x:
                     x = gen_x()
-                    if test_x:
+                    if run_x:
                         t0 = default_timer()
-                        test_x(x)
+                        run_x(x)
                         t1 = default_timer()
                         print(t1-t0)
                         result[kind] = t1-t0
@@ -250,7 +253,7 @@ class Test(Main):
             result = 'g++-mxx'
         return result
 
-    # MODULES...
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ MODULES...
 
     def __generate_modules__(self):
         with PushDir(self.args.dir) as dir:
@@ -303,14 +306,14 @@ class Test(Main):
                         f.write(module_source)
         return modules_levels
 
-    def __test_modules__(self, levels):
+    def __run_modules__(self, levels):
         if self.args.trace:
             print('MODULES_LEVELS:')
             pprint.pprint(levels)
         for level in levels:
             pool = multiprocessing.Pool(processes=int(self.args.jobs))
-            pool.map(__Test_compile_modules_function__,
-                     [(self, m) for m in level])
+            pool.map(__pool_function__,
+                     [[self, '__compile_module__', m] for m in level])
             pool.close()
             pool.join()
 
@@ -366,7 +369,7 @@ import {id};
             exports='\n'.join(module_exports))
         return module_source
 
-    # HEADERS...
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ HEADERS...
 
     def __generate_headers__(self):
         with PushDir(self.args.dir) as dir:
@@ -403,14 +406,14 @@ import {id};
                         f.write(source[1])
         return levels
 
-    def __test_headers__(self, levels):
+    def __run_headers__(self, levels):
         if self.args.trace:
             print('LEVELS:')
             pprint.pprint(levels)
         for level in levels:
             pool = multiprocessing.Pool(processes=int(self.args.jobs))
-            pool.map(__Test_compile_headers_function__,
-                     [(self, m) for m in level])
+            pool.map(__pool_function__,
+                     [[self, '__compile_headers__', m] for m in level])
             pool.close()
             pool.join()
 
@@ -473,7 +476,7 @@ namespace {id}_ns
             id=id)
         return [source, source_cpp]
 
-    # DAG...
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ DAG...
 
     def __generate_dag__(self):
         dag_levels = []
@@ -516,12 +519,9 @@ namespace {id}_ns
         return len(item)+1
 
 
-def __Test_compile_headers_function__(m):
-    m[0].__compile_headers__(m[1])
-
-
-def __Test_compile_modules_function__(m):
-    m[0].__compile_module__(m[1])
+def __pool_function__(x):
+    f = getattr(x[0], x[1])
+    return f(*x[2:])
 
 
 # P1441R0 modules_perf
