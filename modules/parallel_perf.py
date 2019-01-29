@@ -111,28 +111,28 @@ class Test(Main):
             '--test', default='build',
             help='The test to run. Can be one of: build.')
         parser.add_argument(
-            '--kind', required=True,
-            help='The type of test to run. Can be one of: headers, modules.')
+            '--kind', default='headers,modules',
+            help='The type of tests to run. Can be a command separated list of any of: headers, modules.')
         parser.add_argument(
             '--dir', required=True,
             help='The directory root to generate the test files.')
         parser.add_argument(
-            '--count', default=10, type=int,
+            '--count', default=150, type=int,
             help='Number of TUs to generate and process.')
         parser.add_argument(
-            '--complexity', default=1, type=float,
+            '--complexity', default=0.3, type=float,
             help='Complexity of generated code in each TU from 0 to 1, where 1 is most complex.')
         parser.add_argument(
-            '--dag-depth', default='3,3',
+            '--dag-depth', default='2,3',
             help='The range of DAG depths to test as two comma separated values.')
         parser.add_argument(
-            '--dep-factor', default=1.0,
+            '--dep-factor', default=1.0, type=float,
             help='Ratio of dependencies from the TUs in one DAG depth to the previous TUs.')
         parser.add_argument(
-            '--dep-max', default=4,
+            '--dep-max', default=3, type=int,
             help='Maximum number of generated dependencies in source files.')
         parser.add_argument(
-            '--jobs', default=2,
+            '--jobs', default=2, type=int,
             help='Maximum number of parallel jobs to use.')
         parser.add_argument(
             '--use-std', default=False, action='store_true',
@@ -146,6 +146,9 @@ class Test(Main):
         parser.add_argument(
             '--json-out', required=True,
             help='Output resulting test data table as JSON to a file.')
+        parser.add_argument(
+            '--dag-samples', default=20, type=int,
+            help='Number of samples to test in the dag range.')
 
     def __run__(self):
         self.dir = os.getcwd()
@@ -157,7 +160,7 @@ class Test(Main):
         data = []
         dag_depth_range = range(
             args_dag_depth[0], args_dag_depth[1],
-            max([1, int((args_dag_depth[1]-args_dag_depth[0])/10)]))
+            max([1, int((args_dag_depth[1]-args_dag_depth[0])/self.args.dag_samples)]))
         test_x = getattr(self, '__test_%s__' % (self.args.test), False)
         for dag_depth in dag_depth_range:
             self.args.dag_depth = dag_depth
@@ -168,21 +171,23 @@ class Test(Main):
         pprint.pprint(data)
         json_data = [["dag_depth", "headers", "modules"]]
         for d in data:
-            json_data.append([
-                d['dag_depth'],
-                d['headers'],
-                d['modules']
-            ])
+            data_row = [d['dag_depth']]
+            if 'headers' in d:
+                data_row.append(d['headers'])
+            if 'modules' in d:
+                data_row.append(d['modules'])
+            json_data.append(data_row)
         if self.args.json_out:
             self.__save_data__(self.args.json_out, json_data)
 
     def __test_build__(self):
         args_dir = self.args.dir
         result = {
-            'dag_depth': self.args.dag_depth
+            'dag_depth': self.args.dag_depth,
         }
         if hasattr(self.args, 'kind'):
             for kind in self.args.kind.split(','):
+                result['dag_jobs_'+kind] = 0.0
                 self.args.kind = kind
                 print("KIND: %s" % (kind))
                 gen_x = getattr(self, '__generate_%s__' % (kind), False)
@@ -192,7 +197,7 @@ class Test(Main):
                     x = gen_x()
                     if run_x:
                         t0 = default_timer()
-                        run_x(x)
+                        result['dag_jobs_'+kind] = run_x(x)
                         t1 = default_timer()
                         print(t1-t0)
                         result[kind] = t1-t0
@@ -310,12 +315,15 @@ class Test(Main):
         if self.args.trace:
             print('MODULES_LEVELS:')
             pprint.pprint(levels)
+        jobs = 0
         for level in levels:
+            jobs += len(level)
             pool = multiprocessing.Pool(processes=int(self.args.jobs))
             pool.map(__pool_function__,
                      [[self, '__compile_module__', m] for m in level])
             pool.close()
             pool.join()
+        return float(jobs)/float(len(levels))
 
     # CXX -fmodules-ts m0.cpp -c -O0
     def __compile_module__(self, m):
@@ -410,12 +418,15 @@ import {id};
         if self.args.trace:
             print('LEVELS:')
             pprint.pprint(levels)
+        jobs = 0
         for level in levels:
+            jobs += len(level)
             pool = multiprocessing.Pool(processes=int(self.args.jobs))
             pool.map(__pool_function__,
                      [[self, '__compile_headers__', m] for m in level])
             pool.close()
             pool.join()
+        return float(jobs)/float(len(levels))
 
     # CXX m0.cpp -c -O0
     def __compile_headers__(self, m):
@@ -481,24 +492,41 @@ namespace {id}_ns
     def __generate_dag__(self):
         dag_levels = []
         dag_step = float(self.args.count)/float(self.args.dag_depth)
-        dag_deps = []
+        # All the deps from the first dag level down to the n-2
+        dag_deps_top = []
+        # The deps from dag level n-1
+        dag_deps_prev = []
         i = 0
+        r = 0.0
         while i < int(self.args.count):
-            j = i+int(dag_step)
-            if j+(int(dag_step)/2) > int(self.args.count):
+            j = min(int(i+dag_step+r), int(self.args.count))
+            r = i+dag_step+r-j
+            if j+int((dag_step+r)/2) > int(self.args.count):
                 j = int(self.args.count)
+            if self.args.trace:
+                print('GENERATE_DAG: range = [%s, %s), residue = %s, step = %s' % (
+                    i, j, r, dag_step))
             dag_dep_count = min(
                 roundi(self.args.dep_factor*j), int(self.args.dep_max))
             dag_level = []
-            for m in range(int(i), int(j)):
-                dep_count = min(dag_dep_count, len(dag_deps))
+            for m in range(i, j):
+                dep_count = min(dag_dep_count, len(
+                    dag_deps_prev)+len(dag_deps_top))
                 dep_count = 0 if i == 0 else max(1, dep_count)
+                dag_deps = []
+                dag_deps.extend(self.__choices__(dag_deps_prev, 1))
+                if dep_count > 1:
+                    dag_deps.extend(self.__choices__(
+                        dag_deps_top, dep_count-1))
+                if self.args.trace:
+                    print('GENERATE_DAG: dag = %s, deps = %s' %(m, dag_deps))
                 dag_level.append({
                     'index': m,
-                    'deps': sorted(self.__choices__(dag_deps, dep_count))
+                    'deps': dag_deps
                 })
             dag_levels.append(dag_level)
-            dag_deps = list(range(0, int(j)))
+            dag_deps_top = list(range(0, i))
+            dag_deps_prev = list(range(i, j))
             i = j
         if self.args.trace:
             print('DAG_LEVELS:')
@@ -509,6 +537,7 @@ namespace {id}_ns
         # return random.choices(sequence, k=count)
         result = set()
         if len(sequence) > 0:
+            count = min(count, len(sequence))
             while len(result) < count:
                 result.add(random.choice(sequence))
         return result
