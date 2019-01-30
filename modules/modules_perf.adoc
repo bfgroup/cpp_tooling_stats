@@ -87,12 +87,14 @@ chain depth against equivalent non-modular source.
 
 === Method
 
-Overall we perform the basic task of compiling 300 {CPP} source files into
+Overall we perform the basic task of compiling 150 {CPP} source files into
 corresponding object files only. We perform the compile at different dependency
 DAG chain depth counts. Each source depends, either as an `import` or
 `#include`, on some number of sources (headers or modules) from all the
-previous DAG levels. The overall time to compile all 300 files is taken
-as the result of the measurements.
+previous DAG levels. The overall time to compile all 150 files is taken
+as the result of the measurements. An important observation is that at the
+highest DAG depth the arrangement creates a completely linear dependency
+chain.
 
 ==== Modular Source
 
@@ -199,7 +201,12 @@ This is why the generated sources only contain `int` variable definitions.
 
 Along that same line the current modular compiler also seems to have stability
 limits on how many imports can be done. This is why only a maximum of three (3)
-`import` statements are included in the source.
+`import` statements are included in the source. As the compiler errors with
+four (4) or more `import` statements.
+
+Not to be outdone, compiling the header test also has one limitation. The
+compiler has a hard limit of number of include header depth of 150. Which is
+why the tests only cover up to 150 files and consequently a matching DAG depth.
 
 This is a simulation with "perfect" build knowledge as all dependency and source
 information is known before building starts. Hence it is only a very rough
@@ -268,19 +275,7 @@ var parallel_build_chart = create_parallel_build_chart(
     text: 'Jobs: 8',
     subtext: 'Coqui: Intel Mobile Core i7 "Haswell/Crystalwell" (I7-4870HQ) @ 2.5GHz (4 physical cores / 8 threads)'
 },
-[["dag_depth", "headers", "modules"],
- [3, 4.20, 4.03],
- [32, 17.67, 7.25],
- [61, 19.99, 8.92],
- [90, 20.23, 11.78],
- [119, 20.94, 17.66],
- [148, 18.66, 17.67],
- [177, 18.71, 35.62],
- [206, 18.58, 35.40],
- [235, 19.00, 36.04],
- [264, 16.80, 36.04],
- [293, 18.89, 36.10],
-]
+include::data/coqui-150-j008.json[]
 );
 </script>
 ++++
@@ -288,11 +283,14 @@ var parallel_build_chart = create_parallel_build_chart(
 As we can see there is an initial performance advantage to modular source
 over non-modular source. This advantage diminishes as the dependency depth
 grows and hence the number of parallel modular source compiles decreases.
-The performance of the non-modular stays about the same throughout as the
-amount of header information per source doesn't change substantially.
-Whereas the modular build reaches a point where the number of parallel
-builds are either one (1) or two (2) executions making the execution
-essentially linear.
+The performance of the non-modular initially climbs quickly as the amount
+of source increases from transitively including more of the headers.
+That increase eventually flattens when each file is including approximately
+the entire source. This happens roughly at the 1/3 point and matches
+having each header include 3 other headers (i.e. at the 150/3 demarcation).
+Whereas the modular continually increases in time inversely proportional
+to the number of parallel builds that can execute per DAG level. Eventually
+reaching linear execution at the highest DAG level of 150 for this test.
 
 This indicates that as long as we can execute parallel modular compiles at
 the same rate as non-modular compiles it appears that modular compiles have
@@ -301,79 +299,22 @@ a varied but perceptible performance advantage.
 This also indicates that the larger the number of real parallel builds
 possible the less advantage modular compiles have over non-modular compiles.
 
-In the next run we see what using a faster processor does to the differential
-of the two builds. First it's an equivalent 8 job run.
+Below we are building with an approximately equal per core speed machine. But
+this machine is capable of executing up 128 threads with its 32 physical cores.
 
 ++++
-<div id="parallel_build_forge_8" style="height: 400px;"></div>
+<div id="parallel_build_gcc135_16" style="height: 400px;"></div>
 <script type="text/javascript">
 var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_forge_8',
-{
-    text: 'Jobs: 8',
-    subtext: 'Forge: Intel Xeon W-2145 CPU @ 3.70GHz (8 physical cores / 16 w HT)'
-},
-include::data/forge-300-j008.json[]
-);
-</script>
-++++
-
-As we can see the difference is now substantially smaller between non-modular
-and modular. And the modular build looses it's advantage at a much shorter
-DAG depth. We now see data for ever increasing parallel job executions. First
-on the same machine but using the extra CPU threads.
-
-++++
-<div id="parallel_build_forge_16" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_forge_16',
+'parallel_build_gcc135_16',
 {
     text: 'Jobs: 16',
-    subtext: 'Forge: Intel Xeon W-2145 CPU @ 3.70GHz (8 physical cores / 16 w HT)'
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
 },
-include::data/forge-300-j016.json[]
+include::data/gcc135-150-j016.json[]
 );
 </script>
 ++++
-
-And following with a slower machine but with more threads available. In which
-we see almost no advantage of the modular build over the non-modular build.
-
-++++
-<div id="parallel_build_adora_20" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_adora_20',
-{
-    text: 'Jobs: 20',
-    subtext: 'Adora: Intel Xeon CPU E5-2640 v4 @ 2.40GHz(Dual Socket 20 physical cores / 40 w HT)'
-},
-include::data/adora-300-j020.json[]
-);
-</script>
-++++
-
-At this point we have enough available threads that the non-modular build is
-always faster than the modular one.
-
-++++
-<div id="parallel_build_adora_40" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_adora_40',
-{
-    text: 'Jobs: 40',
-    subtext: 'Adora: Intel Xeon CPU E5-2640 v4 @ 2.40GHz(Dual Socket 20 physical cores / 40 w HT)'
-},
-include::data/adora-300-j040.json[]
-);
-</script>
-++++
-
-Changing pace we now look at a higher range of CPU threads on a different
-architecture. For this series of results we go from 32 to 128 parallel
-compiles possible.
 
 ++++
 <div id="parallel_build_gcc135_32" style="height: 400px;"></div>
@@ -384,7 +325,21 @@ var parallel_build_chart = create_parallel_build_chart(
     text: 'Jobs: 32',
     subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
 },
-include::data/gcc135-300-j032.json[]
+include::data/gcc135-150-j032.json[]
+);
+</script>
+++++
+
+++++
+<div id="parallel_build_gcc135_48" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_gcc135_48',
+{
+    text: 'Jobs: 48',
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
+},
+include::data/gcc135-150-j048.json[]
 );
 </script>
 ++++
@@ -398,7 +353,35 @@ var parallel_build_chart = create_parallel_build_chart(
     text: 'Jobs: 64',
     subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
 },
-include::data/gcc135-300-j064.json[]
+include::data/gcc135-150-j064.json[]
+);
+</script>
+++++
+
+++++
+<div id="parallel_build_gcc135_80" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_gcc135_80',
+{
+    text: 'Jobs: 80',
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
+},
+include::data/gcc135-150-j080.json[]
+);
+</script>
+++++
+
+++++
+<div id="parallel_build_gcc135_96" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_gcc135_96',
+{
+    text: 'Jobs: 96',
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
+},
+include::data/gcc135-150-j096.json[]
 );
 </script>
 ++++
@@ -412,65 +395,19 @@ var parallel_build_chart = create_parallel_build_chart(
     text: 'Jobs: 128',
     subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
 },
-include::data/gcc135-300-j128.json[]
+include::data/gcc135-150-j128.json[]
 );
 </script>
 ++++
 
-As we can see the same trend continues and the differences between modular
-and non-modular are heightened. The higher the number of parallel compiles
-the less of an advantage modular appears.
-
-This final set of results should be considered in the context that the machine
-running the tests is not ideally designed for this kind of workload. But as
-such it does highlight the imbalance between parallelism and CPU speed.
-
-++++
-<div id="parallel_build_camelot_68" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_camelot_68',
-{
-    text: 'Jobs: 68',
-    subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
-},
-include::data/camelot-300-j068.json[]
-);
-</script>
-++++
-
-++++
-<div id="parallel_build_camelot_136" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_camelot_136',
-{
-    text: 'Jobs: 136',
-    subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
-},
-include::data/camelot-300-j136.json[]
-);
-</script>
-++++
-
-++++
-<div id="parallel_build_camelot_272" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_camelot_272',
-{
-    text: 'Jobs: 272',
-    subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
-},
-include::data/camelot-300-j272.json[]
-);
-</script>
-++++
+That shows the postulation above that as the number of parallel compiles
+increases modular builds loose more of their advantage at lower and lower
+DAG depths.
 
 == Conclusion
 
 With the limitations of the capabilities of the compiler one can only conclude
-that modular builds could be advantageous only for slower and low parallelism
+that modular builds could be advantageous at lower parallelism levels
 environments. In other words, that modules currently do not scale in the same
 ways as traditional compilation.
 

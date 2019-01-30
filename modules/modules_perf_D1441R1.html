@@ -439,7 +439,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <span id="author" class="author">Rene Rivera</span><br>
 <span id="email" class="email"><a href="mailto:grafikrobot@gmail.com">grafikrobot@gmail.com</a></span><br>
 <span id="revnumber"> D1441R1,</span>
-<span id="revdate">2019-01-27</span>
+<span id="revdate">2019-01-29</span>
 </div>
 <div id="toc" class="toc2">
 <div id="toctitle">Table of Contents</div>
@@ -537,7 +537,7 @@ Document number
 Date
 </td>
 <td class="hdlist2">
-<p>2019-01-27</p>
+<p>2019-01-29</p>
 </td>
 </tr>
 <tr>
@@ -628,12 +628,14 @@ chain depth against equivalent non-modular source.</p>
 <div class="sect2">
 <h3 id="_method"><a class="anchor" href="#_method"></a>4.1. Method</h3>
 <div class="paragraph">
-<p>Overall we perform the basic task of compiling 300 C++ source files into
+<p>Overall we perform the basic task of compiling 150 C++ source files into
 corresponding object files only. We perform the compile at different dependency
 DAG chain depth counts. Each source depends, either as an <code>import</code> or
 <code>#include</code>, on some number of sources (headers or modules) from all the
-previous DAG levels. The overall time to compile all 300 files is taken
-as the result of the measurements.</p>
+previous DAG levels. The overall time to compile all 150 files is taken
+as the result of the measurements. An important observation is that at the
+highest DAG depth the arrangement creates a completely linear dependency
+chain.</p>
 </div>
 <div class="sect3">
 <h4 id="_modular_source"><a class="anchor" href="#_modular_source"></a>4.1.1. Modular Source</h4>
@@ -757,7 +759,13 @@ This is why the generated sources only contain <code>int</code> variable definit
 <div class="paragraph">
 <p>Along that same line the current modular compiler also seems to have stability
 limits on how many imports can be done. This is why only a maximum of three (3)
-<code>import</code> statements are included in the source.</p>
+<code>import</code> statements are included in the source. As the compiler errors with
+four (4) or more <code>import</code> statements.</p>
+</div>
+<div class="paragraph">
+<p>Not to be outdone, compiling the header test also has one limitation. The
+compiler has a hard limit of number of include header depth of 150. Which is
+why the tests only cover up to 150 files and consequently a matching DAG depth.</p>
 </div>
 <div class="paragraph">
 <p>This is a simulation with "perfect" build knowledge as all dependency and source
@@ -821,18 +829,122 @@ var parallel_build_chart = create_parallel_build_chart(
     text: 'Jobs: 8',
     subtext: 'Coqui: Intel Mobile Core i7 "Haswell/Crystalwell" (I7-4870HQ) @ 2.5GHz (4 physical cores / 8 threads)'
 },
-[["dag_depth", "headers", "modules"],
- [3, 4.20, 4.03],
- [32, 17.67, 7.25],
- [61, 19.99, 8.92],
- [90, 20.23, 11.78],
- [119, 20.94, 17.66],
- [148, 18.66, 17.67],
- [177, 18.71, 35.62],
- [206, 18.58, 35.40],
- [235, 19.00, 36.04],
- [264, 16.80, 36.04],
- [293, 18.89, 36.10],
+[
+  [
+    "dag_depth",
+    "headers",
+    "modules"
+  ],
+  [
+    1,
+    2.047581071034074,
+    1.643755764234811
+  ],
+  [
+    8,
+    3.5855454998090863,
+    2.5827421550638974
+  ],
+  [
+    15,
+    7.558886209037155,
+    3.292945663910359
+  ],
+  [
+    22,
+    9.49120874889195,
+    2.782644603867084
+  ],
+  [
+    29,
+    9.932089673820883,
+    3.420704036951065
+  ],
+  [
+    36,
+    11.64911951078102,
+    4.356781066861004
+  ],
+  [
+    43,
+    11.848963083699346,
+    5.059730122797191
+  ],
+  [
+    50,
+    13.914212169125676,
+    5.892489905934781
+  ],
+  [
+    57,
+    12.536496944725513,
+    6.663867154158652
+  ],
+  [
+    64,
+    12.776519584003836,
+    7.49901037523523
+  ],
+  [
+    71,
+    13.750167754944414,
+    8.459747282322496
+  ],
+  [
+    78,
+    13.573011949658394,
+    9.262814636807889
+  ],
+  [
+    85,
+    13.784118541050702,
+    10.11007883027196
+  ],
+  [
+    92,
+    13.214942447375506,
+    10.866925442125648
+  ],
+  [
+    99,
+    13.69074606988579,
+    11.74870520690456
+  ],
+  [
+    106,
+    13.570590225979686,
+    12.587871377822012
+  ],
+  [
+    113,
+    13.901540867984295,
+    13.598692934028804
+  ],
+  [
+    120,
+    14.195203503128141,
+    14.473035192582756
+  ],
+  [
+    127,
+    14.946363707073033,
+    15.371207612100989
+  ],
+  [
+    134,
+    14.427208126988262,
+    16.066386860329658
+  ],
+  [
+    141,
+    14.680705606006086,
+    16.976672722026706
+  ],
+  [
+    148,
+    14.733091264031827,
+    17.813530419021845
+  ]
 ]
 );
 </script>
@@ -840,11 +952,14 @@ var parallel_build_chart = create_parallel_build_chart(
 <p>As we can see there is an initial performance advantage to modular source
 over non-modular source. This advantage diminishes as the dependency depth
 grows and hence the number of parallel modular source compiles decreases.
-The performance of the non-modular stays about the same throughout as the
-amount of header information per source doesn&#8217;t change substantially.
-Whereas the modular build reaches a point where the number of parallel
-builds are either one (1) or two (2) executions making the execution
-essentially linear.</p>
+The performance of the non-modular initially climbs quickly as the amount
+of source increases from transitively including more of the headers.
+That increase eventually flattens when each file is including approximately
+the entire source. This happens roughly at the 1/3 point and matches
+having each header include 3 other headers (i.e. at the 150/3 demarcation).
+Whereas the modular continually increases in time inversely proportional
+to the number of parallel builds that can execute per DAG level. Eventually
+reaching linear execution at the highest DAG level of 150 for this test.</p>
 </div>
 <div class="paragraph">
 <p>This indicates that as long as we can execute parallel modular compiles at
@@ -856,120 +971,136 @@ a varied but perceptible performance advantage.</p>
 possible the less advantage modular compiles have over non-modular compiles.</p>
 </div>
 <div class="paragraph">
-<p>In the next run we see what using a faster processor does to the differential
-of the two builds. First it&#8217;s an equivalent 8 job run.</p>
+<p>Below we are building with an approximately equal per core speed machine. But
+this machine is capable of executing up 128 threads with its 32 physical cores.</p>
 </div>
-<div id="parallel_build_forge_8" style="height: 400px;"></div>
+<div id="parallel_build_gcc135_16" style="height: 400px;"></div>
 <script type="text/javascript">
 var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_forge_8',
-{
-    text: 'Jobs: 8',
-    subtext: 'Forge: Intel Xeon W-2145 CPU @ 3.70GHz (8 physical cores / 16 w HT)'
-},
-[["dag_depth", "headers", "modules"],
-[3, 1.0087610629852861, 0.9181149080395699],
-[32, 6.219321154989302, 3.495909297140315],
-[61, 6.822150422027335, 8.447206597076729],
-[90, 6.62159296288155, 11.705184109974653],
-[119, 7.020121752982959, 16.304624445037916],
-[148, 6.218935227021575, 15.99679002398625],
-[177, 6.920910760993138, 31.80375639302656],
-[206, 6.7199871190823615, 31.809441711986437],
-[235, 7.019685101928189, 32.10625554807484],
-[264, 7.523170454893261, 32.21603080490604],
-[293, 7.421268946025521, 32.819102976005524],
-]
-);
-</script>
-<div class="paragraph">
-<p>As we can see the difference is now substantially smaller between non-modular
-and modular. And the modular build looses it&#8217;s advantage at a much shorter
-DAG depth. We now see data for ever increasing parallel job executions. First
-on the same machine but using the extra CPU threads.</p>
-</div>
-<div id="parallel_build_forge_16" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_forge_16',
+'parallel_build_gcc135_16',
 {
     text: 'Jobs: 16',
-    subtext: 'Forge: Intel Xeon W-2145 CPU @ 3.70GHz (8 physical cores / 16 w HT)'
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
 },
-[["dag_depth", "headers", "modules"],
-[3, 0.7142633509356529, 0.6305585629306734],
-[32, 4.42658746894449, 3.6445175728295],
-[61, 5.120990126160905, 8.498418937902898],
-[90, 4.320516403997317, 11.56579358316958],
-[119, 4.519910953938961, 16.905501161934808],
-[148, 5.923867805162445, 16.80855169799179],
-[177, 5.122375542065129, 34.02343076188117],
-[206, 4.521708729909733, 33.73796621104702],
-[235, 5.422818426974118, 33.539066845783964],
-[264, 5.722841507988051, 33.93446898995899],
-[293, 4.9209292840678245, 34.26832155906595],
+[
+  [
+    "dag_depth",
+    "headers",
+    "modules"
+  ],
+  [
+    1,
+    0.4275169372558594,
+    0.5185210704803467
+  ],
+  [
+    8,
+    2.125641107559204,
+    0.9288849830627441
+  ],
+  [
+    15,
+    3.933159828186035,
+    1.7470829486846924
+  ],
+  [
+    22,
+    4.838046073913574,
+    2.7670199871063232
+  ],
+  [
+    29,
+    5.2369160652160645,
+    3.3806538581848145
+  ],
+  [
+    36,
+    5.941248893737793,
+    4.306736946105957
+  ],
+  [
+    43,
+    6.141770839691162,
+    5.0203351974487305
+  ],
+  [
+    50,
+    6.846549987792969,
+    5.835064888000488
+  ],
+  [
+    57,
+    6.94464898109436,
+    6.684705972671509
+  ],
+  [
+    64,
+    6.84309196472168,
+    7.502121925354004
+  ],
+  [
+    71,
+    6.8433310985565186,
+    8.318428039550781
+  ],
+  [
+    78,
+    7.445662975311279,
+    9.259238958358765
+  ],
+  [
+    85,
+    7.143863916397095,
+    10.104191780090332
+  ],
+  [
+    92,
+    7.1433329582214355,
+    10.77516222000122
+  ],
+  [
+    99,
+    8.04826307296753,
+    11.696542024612427
+  ],
+  [
+    106,
+    7.754353046417236,
+    12.555422067642212
+  ],
+  [
+    113,
+    7.952244997024536,
+    13.21995496749878
+  ],
+  [
+    120,
+    8.15510606765747,
+    14.080713987350464
+  ],
+  [
+    127,
+    7.6477179527282715,
+    15.019285202026367
+  ],
+  [
+    134,
+    8.14616084098816,
+    15.692795991897583
+  ],
+  [
+    141,
+    8.65572714805603,
+    16.630268096923828
+  ],
+  [
+    148,
+    8.54915714263916,
+    17.358685970306396
+  ]
 ]
 );
 </script>
-<div class="paragraph">
-<p>And following with a slower machine but with more threads available. In which
-we see almost no advantage of the modular build over the non-modular build.</p>
-</div>
-<div id="parallel_build_adora_20" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_adora_20',
-{
-    text: 'Jobs: 20',
-    subtext: 'Adora: Intel Xeon CPU E5-2640 v4 @ 2.40GHz(Dual Socket 20 physical cores / 40 w HT)'
-},
-[["dag_depth", "headers", "modules"],
-[3, 0.8324654409661889, 0.7814998480025679],
-[32, 3.6408212459646165, 4.337540799053386],
-[61, 3.8346789749339223, 9.880849721026607],
-[90, 3.7342746899230406, 13.396270678029396],
-[119, 4.135533166001551, 20.20463444001507],
-[148, 3.9350876439129934, 20.0246805800125],
-[177, 3.738359506940469, 40.21712113998365],
-[206, 3.735614522942342, 39.99239156895783],
-[235, 4.337132448912598, 39.88247996591963],
-[264, 4.035582971991971, 39.84508032305166],
-[293, 4.437921910895966, 40.12975517997984],
-]
-);
-</script>
-<div class="paragraph">
-<p>At this point we have enough available threads that the non-modular build is
-always faster than the modular one.</p>
-</div>
-<div id="parallel_build_adora_40" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_adora_40',
-{
-    text: 'Jobs: 40',
-    subtext: 'Adora: Intel Xeon CPU E5-2640 v4 @ 2.40GHz(Dual Socket 20 physical cores / 40 w HT)'
-},
-[["dag_depth", "headers", "modules"],
-[3, 0.5466072140261531, 0.7457621870562434],
-[32, 2.660381791065447, 5.159351971000433],
-[61, 2.8620165209285915, 12.021816556924023],
-[90, 2.6592831240268424, 16.095812772982754],
-[119, 3.071641996037215, 24.11021802900359],
-[148, 2.7618402070365846, 24.295514196972363],
-[177, 2.96113809698727, 48.567696807091124],
-[206, 2.960873455973342, 48.52055719902273],
-[235, 2.959431970026344, 48.238920859992504],
-[264, 2.7622248779516667, 48.05883625894785],
-[293, 2.8615603980142623, 48.27250578906387],
-]
-);
-</script>
-<div class="paragraph">
-<p>Changing pace we now look at a higher range of CPU threads on a different
-architecture. For this series of results we go from 32 to 128 parallel
-compiles possible.</p>
-</div>
 <div id="parallel_build_gcc135_32" style="height: 400px;"></div>
 <script type="text/javascript">
 var parallel_build_chart = create_parallel_build_chart(
@@ -985,59 +1116,241 @@ var parallel_build_chart = create_parallel_build_chart(
     "modules"
   ],
   [
-    3,
-    1.1499571800231934,
-    0.800645112991333
+    1,
+    0.3413398265838623,
+    0.3360769748687744
   ],
   [
-    32,
-    6.475100040435791,
-    4.410186052322388
+    8,
+    1.4411289691925049,
+    1.058077096939087
   ],
   [
-    61,
-    7.7858898639678955,
-    10.05051302909851
+    15,
+    2.8495659828186035,
+    1.9906020164489746
   ],
   [
-    90,
-    6.986098051071167,
-    13.42789912223816
+    22,
+    3.251826047897339,
+    2.930569887161255
   ],
   [
-    119,
-    6.474509000778198,
-    20.13845705986023
+    29,
+    3.7556800842285156,
+    3.8671460151672363
+  ],
+  [
+    36,
+    3.8590781688690186,
+    4.806483030319214
+  ],
+  [
+    43,
+    4.362910985946655,
+    5.742933988571167
+  ],
+  [
+    50,
+    4.564779043197632,
+    6.6864519119262695
+  ],
+  [
+    57,
+    4.883011102676392,
+    7.632982969284058
+  ],
+  [
+    64,
+    4.970871925354004,
+    8.568984031677246
+  ],
+  [
+    71,
+    4.976773023605347,
+    9.508754014968872
+  ],
+  [
+    78,
+    4.968045949935913,
+    10.582046031951904
+  ],
+  [
+    85,
+    5.479862928390503,
+    11.514716148376465
+  ],
+  [
+    92,
+    5.169389963150024,
+    12.327831983566284
+  ],
+  [
+    99,
+    5.370140075683594,
+    13.452305793762207
+  ],
+  [
+    106,
+    5.571798086166382,
+    14.37592101097107
+  ],
+  [
+    113,
+    5.5737528800964355,
+    15.202737092971802
+  ],
+  [
+    120,
+    5.673955917358398,
+    16.09536600112915
+  ],
+  [
+    127,
+    5.8758320808410645,
+    17.200308799743652
+  ],
+  [
+    134,
+    5.772274971008301,
+    18.085076808929443
+  ],
+  [
+    141,
+    6.074195861816406,
+    18.940150022506714
   ],
   [
     148,
-    6.480724096298218,
-    20.150399923324585
+    5.969595193862915,
+    19.852410078048706
+  ]
+]
+);
+</script>
+<div id="parallel_build_gcc135_48" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_gcc135_48',
+{
+    text: 'Jobs: 48',
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
+},
+[
+  [
+    "dag_depth",
+    "headers",
+    "modules"
   ],
   [
-    177,
-    6.173375844955444,
-    40.364349126815796
+    1,
+    0.2602369785308838,
+    0.28079986572265625
   ],
   [
-    206,
-    7.376609802246094,
-    40.40149402618408
+    8,
+    1.2631571292877197,
+    1.215296983718872
   ],
   [
-    235,
-    7.18256402015686,
-    40.460439920425415
+    15,
+    2.2748680114746094,
+    2.276540994644165
   ],
   [
-    264,
-    7.583168983459473,
-    40.54068684577942
+    22,
+    2.8795759677886963,
+    3.3525309562683105
   ],
   [
-    293,
-    5.7687811851501465,
-    40.627676010131836
+    29,
+    3.3024179935455322,
+    4.7010791301727295
+  ],
+  [
+    36,
+    3.500859022140503,
+    5.459131956100464
+  ],
+  [
+    43,
+    3.491713047027588,
+    6.633459091186523
+  ],
+  [
+    50,
+    3.5966501235961914,
+    7.607445955276489
+  ],
+  [
+    57,
+    3.992821216583252,
+    8.7900390625
+  ],
+  [
+    64,
+    3.8142788410186768,
+    9.732953071594238
+  ],
+  [
+    71,
+    4.219695091247559,
+    11.108325958251953
+  ],
+  [
+    78,
+    4.423386812210083,
+    12.032409906387329
+  ],
+  [
+    85,
+    4.396888971328735,
+    13.070539951324463
+  ],
+  [
+    92,
+    4.2105958461761475,
+    14.075057029724121
+  ],
+  [
+    99,
+    4.214250802993774,
+    15.222570896148682
+  ],
+  [
+    106,
+    4.710831880569458,
+    16.27533507347107
+  ],
+  [
+    113,
+    4.595962047576904,
+    17.37357997894287
+  ],
+  [
+    120,
+    4.605752229690552,
+    18.200148105621338
+  ],
+  [
+    127,
+    4.9992711544036865,
+    19.52800488471985
+  ],
+  [
+    134,
+    4.597424030303955,
+    20.348912000656128
+  ],
+  [
+    141,
+    5.017436981201172,
+    21.625916004180908
+  ],
+  [
+    148,
+    5.428776025772095,
+    22.53894305229187
   ]
 ]
 );
@@ -1057,59 +1370,368 @@ var parallel_build_chart = create_parallel_build_chart(
     "modules"
   ],
   [
-    3,
-    0.7993950843811035,
-    0.833683967590332
+    1,
+    0.2914619445800781,
+    0.2724740505218506
   ],
   [
-    32,
-    4.9682300090789795,
-    5.849884033203125
+    8,
+    1.0966391563415527,
+    1.3751909732818604
   ],
   [
-    61,
-    4.963599920272827,
-    13.247076988220215
+    15,
+    2.0118191242218018,
+    2.5923309326171875
   ],
   [
-    90,
-    4.954469919204712,
-    17.50671100616455
+    22,
+    2.516972780227661,
+    3.7911088466644287
   ],
   [
-    119,
-    5.480782985687256,
-    26.25961399078369
+    29,
+    3.1226940155029297,
+    5.020266056060791
+  ],
+  [
+    36,
+    3.3422088623046875,
+    6.231278896331787
+  ],
+  [
+    43,
+    3.0378780364990234,
+    7.527320146560669
+  ],
+  [
+    50,
+    3.5397300720214844,
+    8.650467157363892
+  ],
+  [
+    57,
+    3.314357042312622,
+    10.050405025482178
+  ],
+  [
+    64,
+    3.3373820781707764,
+    11.129668951034546
+  ],
+  [
+    71,
+    3.6325809955596924,
+    12.268187046051025
+  ],
+  [
+    78,
+    3.9437060356140137,
+    13.695375919342041
+  ],
+  [
+    85,
+    3.72418212890625,
+    14.942226886749268
+  ],
+  [
+    92,
+    3.9509711265563965,
+    15.943632125854492
+  ],
+  [
+    99,
+    3.9399330615997314,
+    17.271871089935303
+  ],
+  [
+    106,
+    4.140789985656738,
+    18.528451204299927
+  ],
+  [
+    113,
+    4.043951034545898,
+    19.80996298789978
+  ],
+  [
+    120,
+    4.155106067657471,
+    20.778573989868164
+  ],
+  [
+    127,
+    4.357200860977173,
+    22.189985036849976
+  ],
+  [
+    134,
+    4.35994291305542,
+    23.318957090377808
+  ],
+  [
+    141,
+    4.331891059875488,
+    24.476943016052246
   ],
   [
     148,
-    5.371126890182495,
-    26.13917899131775
+    4.453520059585571,
+    25.561216115951538
+  ]
+]
+);
+</script>
+<div id="parallel_build_gcc135_80" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_gcc135_80',
+{
+    text: 'Jobs: 80',
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
+},
+[
+  [
+    "dag_depth",
+    "headers",
+    "modules"
   ],
   [
-    177,
-    5.038439989089966,
-    52.716537952423096
+    1,
+    0.21349000930786133,
+    0.31618595123291016
   ],
   [
-    206,
-    4.945017099380493,
-    52.78184700012207
+    8,
+    0.9212608337402344,
+    1.5633130073547363
   ],
   [
-    235,
-    4.558218955993652,
-    52.748005867004395
+    15,
+    1.7282719612121582,
+    2.9307758808135986
   ],
   [
-    264,
-    5.747392177581787,
-    52.87318706512451
+    22,
+    2.1533050537109375,
+    4.291851043701172
   ],
   [
-    293,
-    6.054435968399048,
-    52.93238115310669
+    29,
+    2.3506481647491455,
+    5.645557880401611
+  ],
+  [
+    36,
+    2.5434160232543945,
+    7.031563997268677
+  ],
+  [
+    43,
+    2.5516018867492676,
+    8.406389951705933
+  ],
+  [
+    50,
+    2.6471691131591797,
+    9.751949071884155
+  ],
+  [
+    57,
+    2.870911121368408,
+    11.337335109710693
+  ],
+  [
+    64,
+    2.974073886871338,
+    12.529186964035034
+  ],
+  [
+    71,
+    3.048424005508423,
+    13.996721982955933
+  ],
+  [
+    78,
+    2.8507778644561768,
+    15.497245073318481
+  ],
+  [
+    85,
+    3.0657849311828613,
+    16.983114004135132
+  ],
+  [
+    92,
+    3.258636951446533,
+    18.070364952087402
+  ],
+  [
+    99,
+    3.171160936355591,
+    19.677009105682373
+  ],
+  [
+    106,
+    3.0632309913635254,
+    21.020369052886963
+  ],
+  [
+    113,
+    3.3747620582580566,
+    22.159507036209106
+  ],
+  [
+    120,
+    3.4775309562683105,
+    23.695492029190063
+  ],
+  [
+    127,
+    3.3700308799743652,
+    25.080610990524292
+  ],
+  [
+    134,
+    3.4806790351867676,
+    26.25156283378601
+  ],
+  [
+    141,
+    3.5681381225585938,
+    27.433927059173584
+  ],
+  [
+    148,
+    3.666393995285034,
+    29.00312900543213
+  ]
+]
+);
+</script>
+<div id="parallel_build_gcc135_96" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_gcc135_96',
+{
+    text: 'Jobs: 96',
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
+},
+[
+  [
+    "dag_depth",
+    "headers",
+    "modules"
+  ],
+  [
+    1,
+    0.23974204063415527,
+    0.34315991401672363
+  ],
+  [
+    8,
+    0.9601490497589111,
+    1.7621288299560547
+  ],
+  [
+    15,
+    1.5744178295135498,
+    3.3012309074401855
+  ],
+  [
+    22,
+    1.9723598957061768,
+    4.860388994216919
+  ],
+  [
+    29,
+    2.2847321033477783,
+    6.378109931945801
+  ],
+  [
+    36,
+    2.3712217807769775,
+    7.867828130722046
+  ],
+  [
+    43,
+    2.69165301322937,
+    9.436952829360962
+  ],
+  [
+    50,
+    2.68546199798584,
+    11.102751970291138
+  ],
+  [
+    57,
+    2.580353021621704,
+    12.625380992889404
+  ],
+  [
+    64,
+    2.5873920917510986,
+    14.107476949691772
+  ],
+  [
+    71,
+    2.69301700592041,
+    15.636852025985718
+  ],
+  [
+    78,
+    2.796753168106079,
+    17.54341983795166
+  ],
+  [
+    85,
+    2.697300910949707,
+    19.066941022872925
+  ],
+  [
+    92,
+    3.0980491638183594,
+    20.363383054733276
+  ],
+  [
+    99,
+    3.104820966720581,
+    22.17218589782715
+  ],
+  [
+    106,
+    3.203166961669922,
+    23.753036975860596
+  ],
+  [
+    113,
+    3.1926679611206055,
+    24.93696689605713
+  ],
+  [
+    120,
+    3.309997081756592,
+    26.583822011947632
+  ],
+  [
+    127,
+    3.4048449993133545,
+    28.351689100265503
+  ],
+  [
+    134,
+    3.284719944000244,
+    29.700826168060303
+  ],
+  [
+    141,
+    3.206835985183716,
+    31.247167110443115
+  ],
+  [
+    148,
+    3.520148992538452,
+    32.72217392921448
   ]
 ]
 );
@@ -1129,142 +1751,123 @@ var parallel_build_chart = create_parallel_build_chart(
     "modules"
   ],
   [
-    3,
-    0.5676569938659668,
-    0.8597321510314941
+    1,
+    0.2856931686401367,
+    0.3975369930267334
   ],
   [
-    32,
-    2.785491943359375,
-    9.304991960525513
+    8,
+    0.9141650199890137,
+    2.1820430755615234
   ],
   [
-    61,
-    3.186284065246582,
-    20.853742122650146
+    15,
+    1.5307579040527344,
+    4.166504144668579
   ],
   [
-    90,
-    3.286099910736084,
-    27.837176084518433
+    22,
+    1.9396891593933105,
+    6.079208135604858
   ],
   [
-    119,
-    3.290584087371826,
-    41.82184100151062
+    29,
+    1.9407129287719727,
+    8.063982009887695
+  ],
+  [
+    36,
+    2.056518077850342,
+    9.955644845962524
+  ],
+  [
+    43,
+    2.248806953430176,
+    11.944358825683594
+  ],
+  [
+    50,
+    2.459678888320923,
+    13.906062126159668
+  ],
+  [
+    57,
+    2.5518689155578613,
+    15.971055030822754
+  ],
+  [
+    64,
+    2.5451409816741943,
+    17.857609033584595
+  ],
+  [
+    71,
+    2.6535959243774414,
+    19.73924684524536
+  ],
+  [
+    78,
+    2.767738103866577,
+    21.963953971862793
+  ],
+  [
+    85,
+    2.567255973815918,
+    24.02560806274414
+  ],
+  [
+    92,
+    2.778745174407959,
+    25.571998119354248
+  ],
+  [
+    99,
+    2.671147108078003,
+    27.848523139953613
+  ],
+  [
+    106,
+    2.761867046356201,
+    30.083997011184692
+  ],
+  [
+    113,
+    2.8824219703674316,
+    31.48926591873169
+  ],
+  [
+    120,
+    3.0811710357666016,
+    34.007904052734375
+  ],
+  [
+    127,
+    2.9717559814453125,
+    35.8999559879303
+  ],
+  [
+    134,
+    2.973538875579834,
+    37.55758500099182
+  ],
+  [
+    141,
+    3.182023048400879,
+    39.64533996582031
   ],
   [
     148,
-    3.3075339794158936,
-    41.81191802024841
-  ],
-  [
-    177,
-    3.2852180004119873,
-    84.24899697303772
-  ],
-  [
-    206,
-    3.102052927017212,
-    84.27340197563171
-  ],
-  [
-    235,
-    3.1731510162353516,
-    84.180330991745
-  ],
-  [
-    264,
-    3.2779219150543213,
-    84.43389201164246
-  ],
-  [
-    293,
-    3.4889698028564453,
-    84.91905903816223
+    3.2829389572143555,
+    41.67250609397888
   ]
 ]
 );
 </script>
 <div class="paragraph">
-<p>As we can see the same trend continues and the differences between modular
-and non-modular are heightened. The higher the number of parallel compiles
-the less of an advantage modular appears.</p>
+<p>That shows the postulation above that as the number of parallel compiles
+increases modular builds loose more of their advantage at lower and lower
+DAG depths.</p>
 </div>
-<div class="paragraph">
-<p>This final set of results should be considered in the context that the machine
-running the tests is not ideally designed for this kind of workload. But as
-such it does highlight the imbalance between parallelism and CPU speed.</p>
-</div>
-<div id="parallel_build_camelot_68" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_camelot_68',
-{
-    text: 'Jobs: 68',
-    subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
-},
-[["dag_depth", "headers", "modules"],
-[3, 1.7595279880333692, 2.1799887949600816],
-[32, 8.06883534498047, 18.5961584339384],
-[61, 9.096224897075444, 42.67319647106342],
-[90, 9.611890556057915, 56.74518109404016],
-[119, 9.153583665029146, 85.26279399089981],
-[148, 7.369923300924711, 85.27267788292374],
-[177, 8.252392338006757, 170.98840467899572],
-[206, 9.793684736941941, 170.75660639989655],
-[235, 10.23349713603966, 170.82041397399735],
-[264, 9.471675020991825, 171.1151053160429],
-[293, 9.702734051970765, 170.9213510870468],
-]
-);
-</script>
-<div id="parallel_build_camelot_136" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_camelot_136',
-{
-    text: 'Jobs: 136',
-    subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
-},
-[["dag_depth", "headers", "modules"],
-[3, 2.0307430600514635, 3.4948218159843236],
-[32, 6.0405289239715785, 35.49258812505286],
-[61, 6.764967894996516, 81.36800942802802],
-[90, 6.280745088937692, 109.36394645192195],
-[119, 6.335177005967125, 163.58082887192722],
-[148, 6.615980034926906, 163.45939861994702],
-[177, 7.076706105028279, 328.559180035023],
-[206, 6.492715556989424, 328.74980488594156],
-[235, 7.19850400602445, 327.94702022802085],
-[264, 6.596547717927024, 328.61911632702686],
-[293, 6.832825995050371, 328.309868671],
-]
-);
-</script>
-<div id="parallel_build_camelot_272" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_camelot_272',
-{
-    text: 'Jobs: 272',
-    subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
-},
-[["dag_depth", "headers", "modules"],
-[3, 3.4972561289323494, 8.472751475055702],
-[32, 7.411651192000136, 96.71444478898775],
-[61, 7.176073360955343, 222.80584899999667],
-[90, 7.527861946960911, 300.56390088098124],
-[119, 7.30671163299121, 447.55594796303194],
-[148, 8.037210080889054, 449.50167113903444],
-[177, 7.704545061104, 900.5817094079684],
-[206, 7.564260617014952, 898.9721814970253],
-[235, 7.595040827989578, 906.8235456779366],
-[264, 7.5456773799378425, 907.7898443009472],
-[293, 6.927266972954385, 899.7880558320321],
-]
-);
-</script>
 </div>
 </div>
 </div>
@@ -1273,7 +1876,7 @@ var parallel_build_chart = create_parallel_build_chart(
 <div class="sectionbody">
 <div class="paragraph">
 <p>With the limitations of the capabilities of the compiler one can only conclude
-that modular builds could be advantageous only for slower and low parallelism
+that modular builds could be advantageous at lower parallelism levels
 environments. In other words, that modules currently do not scale in the same
 ways as traditional compilation.</p>
 </div>
