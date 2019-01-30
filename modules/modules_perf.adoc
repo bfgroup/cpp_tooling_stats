@@ -47,9 +47,11 @@ Measurements of the performance of building {CPP} modules and relevant compariso
 
 === R1
 
-Fix grammatical errors. Ran tests on a high CPU machine from the GCC Farm
-Project. Additional data of parallel building from higher thread
-and faster hardware, thanks to Robert Maynard for running the tests.
+Fix bug in test generation and DAG calculation that resulted in non-uniform
+growth in the modular test times. Fix grammatical errors. Ran tests on a high
+CPU machine from the GCC Farm Project. Additional data of parallel building
+from higher thread and faster hardware, thanks to Robert Maynard for running
+the tests.
 
 === R0 (Initial)
 
