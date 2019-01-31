@@ -51,7 +51,7 @@ Fix bug in test generation and DAG calculation that resulted in non-uniform
 growth in the modular test times. Fix grammatical errors. Ran tests on a high
 CPU machine from the GCC Farm Project. Additional data of parallel building
 from higher thread and faster hardware, thanks to Robert Maynard for running
-the tests.
+the tests and for the GCC Compile Farm for access to their machines.
 
 === R0 (Initial)
 
@@ -405,6 +405,114 @@ include::data/gcc135-150-j128.json[]
 That shows the postulation above that as the number of parallel compiles
 increases modular builds loose more of their advantage at lower and lower
 DAG depths.
+
+Below is another series of increasing parallelism. This it's split across
+three different machines and also arranged from fastest to slowest CPU clock
+speeds. The parallelism goes past the maximum of 150 concurrent compiles
+for the last machine.
+
+++++
+<div id="parallel_build_forge_08" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_forge_08',
+{
+    text: 'Jobs: 8',
+    subtext: 'Forge: Intel Xeon W-2145 CPU @ 3.70GHz (8 physical cores / 16 w HT)'
+},
+include::data/forge-150-j008.json[]
+);
+</script>
+++++
+
+++++
+<div id="parallel_build_forge_16" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_forge_16',
+{
+    text: 'Jobs: 16',
+    subtext: 'Forge: Intel Xeon W-2145 CPU @ 3.70GHz (8 physical cores / 16 w HT)'
+},
+include::data/forge-150-j016.json[]
+);
+</script>
+++++
+
+++++
+<div id="parallel_build_adora_20" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_adora_20',
+{
+    text: 'Jobs: 20',
+    subtext: 'Adora: Intel Xeon CPU E5-2640 v4 @ 2.40GHz(Dual Socket 20 physical cores / 40 w HT)'
+},
+include::data/adora-150-j020.json[]
+);
+</script>
+++++
+
+++++
+<div id="parallel_build_adora_40" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_adora_40',
+{
+    text: 'Jobs: 40',
+    subtext: 'Adora: Intel Xeon CPU E5-2640 v4 @ 2.40GHz(Dual Socket 20 physical cores / 40 w HT)'
+},
+include::data/adora-150-j040.json[]
+);
+</script>
+++++
+
+NOTE: This Camelot machine is not ideally suited for this type of workload.
+But shows the effect of going slow but wide on parallelism. Which is a
+common tradeoff in play with distributed builds.
+
+++++
+<div id="parallel_build_camelot_68" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_camelot_68',
+{
+    text: 'Jobs: 68',
+    subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
+},
+include::data/camelot-150-j068.json[]
+);
+</script>
+++++
+
+++++
+<div id="parallel_build_camelot_136" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_camelot_136',
+{
+    text: 'Jobs: 136',
+    subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
+},
+include::data/camelot-150-j136.json[]
+);
+</script>
+++++
+
+++++
+<div id="parallel_build_camelot_272" style="height: 400px;"></div>
+<script type="text/javascript">
+var parallel_build_chart = create_parallel_build_chart(
+'parallel_build_camelot_272',
+{
+    text: 'Jobs: 272',
+    subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
+},
+include::data/camelot-150-j272.json[]
+);
+</script>
+++++
+
 
 == Conclusion
 
