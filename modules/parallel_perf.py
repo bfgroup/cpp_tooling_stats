@@ -149,6 +149,9 @@ class Test(Main):
         parser.add_argument(
             '--dag-samples', default=20, type=int,
             help='Number of samples to test in the dag range.')
+        parser.add_argument(
+            '--use-mapper-file', default=False, action='store_true',
+            help='Use module mapper file, instead of the default built-in compiler mapper.')
 
     def __run__(self):
         self.dir = os.getcwd()
@@ -190,10 +193,13 @@ class Test(Main):
                 result['dag_jobs_'+kind] = 0.0
                 self.args.kind = kind
                 print("KIND: %s" % (kind))
+                pre_x = getattr(self, '__pre_%s__' % (kind), False)
                 gen_x = getattr(self, '__generate_%s__' % (kind), False)
                 run_x = getattr(self, '__run_%s__' % (kind), False)
                 self.args.dir = os.path.join(args_dir, kind)
                 if gen_x:
+                    if pre_x:
+                        pre_x()
                     x = gen_x()
                     if run_x:
                         t0 = default_timer()
@@ -289,6 +295,7 @@ class Test(Main):
                 ])
         with PushDir(self.args.dir) as dir:
             dag_deps = {}
+            module_map = {}
             for dag_level in dag_levels:
                 modules_level = []
                 for m in dag_level:
@@ -299,9 +306,11 @@ class Test(Main):
             for n in range(int(self.args.count)):
                 module_id = 'm%s' % (n)
                 module_mxx = os.path.join(dir, module_id + '.cpp')
+                module_bmi = os.path.join(dir, module_id + '.gcm')
                 module_deps = ['m%s' % (n) for n in dag_deps[n]]
                 module_source = self.__make_module_source__(
                     module_id, module_deps)
+                module_map[module_id] = module_bmi
                 if self.args.debug:
                     print('FILE: %s' % (module_mxx))
                     print(module_source)
@@ -309,6 +318,16 @@ class Test(Main):
                 else:
                     with open(module_mxx, 'w') as f:
                         f.write(module_source)
+            if self.args.use_mapper_file:
+                mapper_file = os.path.join(dir, 'mm.csv')
+                if self.args.debug:
+                    print('MAP: %s' % (mapper_file))
+                    pprint.pprint(module_map)
+                    print('-----')
+                else:
+                    with open(mapper_file, 'w') as f:
+                        for module_id, module_bmi in module_map.items():
+                            f.write('%s %s\n' % (module_id, module_bmi))
         return modules_levels
 
     def __run_modules__(self, levels):
@@ -327,11 +346,13 @@ class Test(Main):
 
     # CXX -fmodules-ts m0.cpp -c -O0
     def __compile_module__(self, m):
-        with PushDir(os.path.dirname(m)):
+        with PushDir(os.path.dirname(m)) as dir:
             cc = [
                 self.cxx,
                 '-fmodules-ts', '-c', '-O0',
                 os.path.basename(m)]
+            if self.args.use_mapper_file:
+                cc.append('-fmodule-mapper=%s' % (os.path.join(dir, 'mm.csv')))
             if self.args.use_std:
                 cc.extend(['-I', os.path.join(self.dir, '..', 'std-modules')])
             if self.args.debug:
@@ -557,7 +578,8 @@ def __pool_function__(x):
 # ./parallel_perf.py --dir=/Users/grafik/devcache/cpp_stats --kind=headers,modules --jobs=8 --dep-max=3 --count=300 --complexity=0.3 --def-ints --dag-depth=3,300
 
 # D1441R1
-# ./parallel_perf.py --dir=/Users/grafik/devcache/cpp_stats --def-ints --dag-depth=1,151 --json-out=data.json --jobs=8
+# ./parallel_perf.py --dir=/Users/grafik/devcache/cpp_stats --def-ints --dag-depth=1,151 --jobs=8 --json-out=data.json
+# ./parallel_perf.py --dir=/Users/grafik/devcache/cpp_stats --def-ints --dag-depth=1,151 --jobs=8 --json-out=data-mm.json --use-mapper-file
 
 if __name__ == "__main__":
     Test()
