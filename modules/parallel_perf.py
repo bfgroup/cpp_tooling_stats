@@ -313,21 +313,21 @@ class Test(Main):
             with PushDir(self.args.dir) as dir:
                 os.symlink(
                     os.path.join(std_modules_dir, 'std-core.mxx'),
-                    os.path.join(dir, 'std.core.cpp'))
+                    os.path.join(dir, 'std.core.mpp'))
                 os.symlink(
                     os.path.join(std_modules_dir, 'std-io.mxx'),
-                    os.path.join(dir, 'std.io.cpp'))
+                    os.path.join(dir, 'std.io.mpp'))
                 os.symlink(
                     os.path.join(std_modules_dir, 'std-regex.mxx'),
-                    os.path.join(dir, 'std.regex.cpp'))
+                    os.path.join(dir, 'std.regex.mpp'))
                 os.symlink(
                     os.path.join(std_modules_dir, 'std-threading.mxx'),
-                    os.path.join(dir, 'std.threading.cpp'))
+                    os.path.join(dir, 'std.threading.mpp'))
                 modules_levels.append([
-                    os.path.join(dir, 'std.core.cpp'),
+                    os.path.join(dir, 'std.core.mpp'),
                 ])
                 modules_levels.append([
-                    os.path.join(dir, 'std.io.cpp'),
+                    os.path.join(dir, 'std.io.mpp'),
                 ])
         with PushDir(self.args.dir) as dir:
             dag_deps = {}
@@ -337,11 +337,11 @@ class Test(Main):
                 for m in dag_level:
                     dag_deps[m['index']] = m['deps']
                     modules_level.append(os.path.join(
-                        dir, 'm%s' % (m['index']) + '.cpp'))
+                        dir, 'm%s' % (m['index']) + '.mpp'))
                 modules_levels.append(modules_level)
             for n in range(int(self.args.count)):
                 module_id = 'm%s' % (n)
-                module_mxx = os.path.join(dir, module_id + '.cpp')
+                module_mxx = os.path.join(dir, module_id + '.mpp')
                 module_bmi = os.path.join(dir, module_id + '.gcm')
                 module_deps = ['m%s' % (n) for n in dag_deps[n]]
                 module_source = self.__make_module_source__(
@@ -380,12 +380,12 @@ class Test(Main):
             pool.join()
         return float(jobs)/float(len(levels))
 
-    # CXX -fmodules-ts m0.cpp -c -O0
+    # CXX -fmodules-ts m0.mpp -c -O0 -x c++
     def __compile_module__(self, m):
         with PushDir(os.path.dirname(m)) as dir:
             cc = [
                 self.cxx,
-                '-fmodules-ts', '-c', '-O0',
+                '-fmodules-ts', '-c', '-O0', '-x', 'c++',
                 os.path.basename(m)]
             if self.args.use_mapper_file:
                 cc.append('-fmodule-mapper=%s' % (os.path.join(dir, 'mm.csv')))
@@ -456,12 +456,12 @@ import {id};
                 for m in dag_level:
                     dag_deps[m['index']] = m['deps']
                     level.append(os.path.join(
-                        dir, id_t % (m['index']) + '.cpp'))
+                        dir, id_t % (m['index']) + '.mpp'))
             levels.append(level)
             for n in range(int(self.args.count)):
                 id = id_t % (n)
                 hpp = os.path.join(dir, id + '.hpp')
-                cpp = os.path.join(dir, id + '.cpp')
+                cpp = os.path.join(dir, id + '.mpp')
                 deps = [id_t % (n) for n in dag_deps[n]]
                 source = self.__make_headers_source__(id, deps)
                 if self.args.debug:
@@ -492,12 +492,12 @@ import {id};
             pool.join()
         return float(jobs)/float(len(levels))
 
-    # CXX m0.cpp -c -O0
+    # CXX m0.mpp -c -O0 -x c++
     def __compile_headers__(self, m):
         with PushDir(os.path.dirname(m)):
             cc = [
                 self.cxx,
-                '-c', '-O0',
+                '-c', '-O0', '-x', 'c++',
                 os.path.basename(m)
             ]
             if self.args.debug:
