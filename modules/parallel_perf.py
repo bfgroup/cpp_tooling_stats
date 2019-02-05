@@ -152,6 +152,12 @@ class Test(Main):
         parser.add_argument(
             '--use-mapper-file', default=False, action='store_true',
             help='Use module mapper file, instead of the default built-in compiler mapper.')
+        parser.add_argument(
+            '--use-c-headers', default=False, action='store_true',
+            help='Add inclusion of C headers.')
+        parser.add_argument(
+            '--no-run', default=False, action='store_true',
+            help='Do not run the test compilations, i.e. only generate the test sources.')
 
     def __run__(self):
         self.dir = os.getcwd()
@@ -170,7 +176,7 @@ class Test(Main):
             self.args.kind = args_kind
             sample = test_x()
             data.append(sample)
-            pprint.pprint(sample)
+            # pprint.pprint(sample)
         pprint.pprint(data)
         json_data = [["dag_depth", "headers", "modules"]]
         for d in data:
@@ -192,7 +198,6 @@ class Test(Main):
             for kind in self.args.kind.split(','):
                 result['dag_jobs_'+kind] = 0.0
                 self.args.kind = kind
-                print("KIND: %s" % (kind))
                 pre_x = getattr(self, '__pre_%s__' % (kind), False)
                 gen_x = getattr(self, '__generate_%s__' % (kind), False)
                 run_x = getattr(self, '__run_%s__' % (kind), False)
@@ -201,11 +206,16 @@ class Test(Main):
                     if pre_x:
                         pre_x()
                     x = gen_x()
-                    if run_x:
+                    if self.args.no_run:
+                        result['dag_jobs_'+kind] = 0
+                        result[kind] = 0.0
+                    elif run_x:
                         t0 = default_timer()
                         result['dag_jobs_'+kind] = run_x(x)
                         t1 = default_timer()
-                        print(t1-t0)
+                        print("KIND: %s, DEPTH: %s JOBS: %s => %s" %
+                              (kind, self.args.dag_depth,
+                               result['dag_jobs_'+kind], t1-t0))
                         result[kind] = t1-t0
         return result
 
@@ -230,6 +240,19 @@ class Test(Main):
                 l = roundi(float(self.args.complexity)
                            * len(self.__std_imports__))
                 return self.__std_imports__[0:l]
+        else:
+            return []
+
+    __c_includes__ = [
+        '#include <time.h>',
+        '#include <stdio.h>',
+        '#include <string.h>',
+    ]
+
+    @property
+    def c_includes(self):
+        if self.args.use_c_headers:
+            return [random.choice(self.__c_includes__)]
         else:
             return []
 
@@ -355,6 +378,10 @@ class Test(Main):
                 cc.append('-fmodule-mapper=%s' % (os.path.join(dir, 'mm.csv')))
             if self.args.use_std:
                 cc.extend(['-I', os.path.join(self.dir, '..', 'std-modules')])
+            cc.extend([
+                # '-fmodule-lazy',
+                # '-fmodule-only',
+            ])
             if self.args.debug:
                 sleep(random.uniform(0.0, 0.1))
                 print('C++: "%s"' % ('" "'.join(cc)))
@@ -366,6 +393,8 @@ class Test(Main):
                     print('C++: "%s" => %s' % ('" "'.join(cc), t1-t0))
 
     __module_template__ = '''\
+module;
+{c_includes}
 export module {id};
 {std_includes}
 {imports}
@@ -393,6 +422,7 @@ import {id};
             module_size += Test.__append__(module_exports, c)
         module_source = self.__module_template__.format(
             id=id,
+            c_includes='\n'.join(self.c_includes),
             std_includes='\n'.join(self.std_includes),
             imports=''.join(module_imports),
             exports='\n'.join(module_exports))
@@ -470,6 +500,7 @@ import {id};
     __headers_template__ = '''\
 #ifndef H_GUARD_{id}
 #define H_GUARD_{id}
+{c_includes}
 {includes}
 {std_includes}
 namespace {id}_ns
@@ -501,6 +532,7 @@ namespace {id}_ns
             size += Test.__append__(exports, c)
         source = self.__headers_template__.format(
             id=id,
+            c_includes='\n'.join(self.c_includes),
             std_includes='\n'.join(self.std_includes),
             includes=''.join(includes),
             exports='\n'.join(exports))
@@ -540,7 +572,7 @@ namespace {id}_ns
                     dag_deps.extend(self.__choices__(
                         dag_deps_top, dep_count-1))
                 if self.args.trace:
-                    print('GENERATE_DAG: dag = %s, deps = %s' %(m, dag_deps))
+                    print('GENERATE_DAG: dag = %s, deps = %s' % (m, dag_deps))
                 dag_level.append({
                     'index': m,
                     'deps': dag_deps
