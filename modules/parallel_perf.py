@@ -7,6 +7,7 @@
 """
 import argparse
 import json
+import math
 import multiprocessing
 import os
 import os.path
@@ -158,6 +159,9 @@ class Test(Main):
         parser.add_argument(
             '--no-run', default=False, action='store_true',
             help='Do not run the test compilations, i.e. only generate the test sources.')
+        parser.add_argument(
+            '--run-samples', default=5, type=int,
+            help='Number of times to run each test and average.')
 
     def __run__(self):
         self.dir = os.getcwd()
@@ -210,13 +214,22 @@ class Test(Main):
                         result['dag_jobs_'+kind] = 0
                         result[kind] = 0.0
                     elif run_x:
-                        t0 = default_timer()
-                        result['dag_jobs_'+kind] = run_x(x)
-                        t1 = default_timer()
+                        run_dag_jobs = []
+                        run_time = []
+                        for _ in range(self.args.run_samples):
+                            t0 = default_timer()
+                            run_dag_jobs.append(run_x(x))
+                            run_time.append(default_timer()-t0)
+                        run_time.sort()
+                        if len(run_time) >= 5:
+                            run_time = run_time[1:-2]
+                        result['dag_jobs_' + kind] \
+                            = math.fsum(run_dag_jobs)/float(len(run_dag_jobs))
+                        result[kind] \
+                            = math.fsum(run_time)/float(len(run_time))
                         print("KIND: %s, DEPTH: %s JOBS: %s => %s" %
                               (kind, self.args.dag_depth,
-                               result['dag_jobs_'+kind], t1-t0))
-                        result[kind] = t1-t0
+                               result['dag_jobs_'+kind], result[kind]))
         return result
 
     __std_includes__ = [
