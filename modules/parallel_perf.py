@@ -456,12 +456,12 @@ import {id};
                 for m in dag_level:
                     dag_deps[m['index']] = m['deps']
                     level.append(os.path.join(
-                        dir, id_t % (m['index']) + '.mpp'))
+                        dir, id_t % (m['index']) + '.cpp'))
             levels.append(level)
             for n in range(int(self.args.count)):
                 id = id_t % (n)
                 hpp = os.path.join(dir, id + '.hpp')
-                cpp = os.path.join(dir, id + '.mpp')
+                cpp = os.path.join(dir, id + '.cpp')
                 deps = [id_t % (n) for n in dag_deps[n]]
                 source = self.__make_headers_source__(id, deps)
                 if self.args.debug:
