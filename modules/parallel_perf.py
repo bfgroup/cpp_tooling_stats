@@ -151,9 +151,6 @@ class Test(Main):
             '--dag-samples', default=20, type=int,
             help='Number of samples to test in the dag range.')
         parser.add_argument(
-            '--use-mapper-file', default=False, action='store_true',
-            help='Use module mapper file, instead of the default built-in compiler mapper.')
-        parser.add_argument(
             '--use-c-headers', default=False, action='store_true',
             help='Add inclusion of C headers.')
         parser.add_argument(
@@ -162,6 +159,9 @@ class Test(Main):
         parser.add_argument(
             '--run-samples', default=5, type=int,
             help='Number of times to run each test and average.')
+        parser.add_argument(
+            '--toolset', default='gcc',
+            help='Which toolset to run tests for. Can be one or more of: gcc, clang.')
 
     def __run__(self):
         self.dir = os.getcwd()
@@ -202,14 +202,14 @@ class Test(Main):
             for kind in self.args.kind.split(','):
                 result['dag_jobs_'+kind] = 0.0
                 self.args.kind = kind
-                pre_x = getattr(self, '__pre_%s__' % (kind), False)
                 gen_x = getattr(self, '__generate_%s__' % (kind), False)
+                pre_x = getattr(self, '__pre_%s__' % (kind), False)
                 run_x = getattr(self, '__run_%s__' % (kind), False)
                 self.args.dir = os.path.join(args_dir, kind)
                 if gen_x:
+                    x = gen_x()
                     if pre_x:
                         pre_x()
-                    x = gen_x()
                     if self.args.no_run:
                         result['dag_jobs_'+kind] = 0
                         result[kind] = 0.0
@@ -291,13 +291,17 @@ class Test(Main):
     @property
     def cxx(self):
         result = os.getenv('CXX')
-        if not result and os.path.isfile('/Developer/Tools/gcc-modules/bin/g++-mxx'):
-            result = '/Developer/Tools/gcc-modules/bin/g++-mxx'
-        if not result and os.path.isfile(os.path.join(os.getenv('HOME'), 'gcc-modules', 'bin', 'g++-mxx')):
-            result = os.path.isfile(os.path.join(
-                os.getenv('HOME'), 'gcc-modules', 'bin', 'g++-mxx'))
-        if not result:
-            result = 'g++-mxx'
+        if self.args.toolset == 'gcc':
+            if not result and os.path.isfile('/Developer/Tools/gcc-modules/bin/g++-mxx'):
+                result = '/Developer/Tools/gcc-modules/bin/g++-mxx'
+            if not result and os.path.isfile(os.path.join(os.getenv('HOME'), 'gcc-modules', 'bin', 'g++-mxx')):
+                result = os.path.isfile(os.path.join(
+                    os.getenv('HOME'), 'gcc-modules', 'bin', 'g++-mxx'))
+            if not result:
+                result = 'g++-mxx'
+        elif self.args.toolset == 'clang':
+            if not result:
+                result = 'clang++'
         return result
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ MODULES...
@@ -342,7 +346,11 @@ class Test(Main):
             for n in range(int(self.args.count)):
                 module_id = 'm%s' % (n)
                 module_mxx = os.path.join(dir, module_id + '.mpp')
-                module_bmi = os.path.join(dir, module_id + '.gcm')
+                module_bmi = None
+                if self.args.toolset == 'gcc':
+                    module_bmi = os.path.join(dir, module_id + '.gcm')
+                elif self.args.toolset == 'clang':
+                    module_bmi = os.path.join(dir, module_id + '.mpp.pcm')
                 module_deps = ['m%s' % (n) for n in dag_deps[n]]
                 module_source = self.__make_module_source__(
                     module_id, module_deps)
@@ -354,16 +362,20 @@ class Test(Main):
                 else:
                     with open(module_mxx, 'w') as f:
                         f.write(module_source)
-            if self.args.use_mapper_file:
-                mapper_file = os.path.join(dir, 'mm.csv')
-                if self.args.debug:
-                    print('MAP: %s' % (mapper_file))
-                    pprint.pprint(module_map)
-                    print('-----')
-                else:
-                    with open(mapper_file, 'w') as f:
+            if self.args.debug:
+                print('MAP: %s' % (mapper_file))
+                pprint.pprint(module_map)
+                print('-----')
+            else:
+                if self.args.toolset == 'gcc':
+                    with open(os.path.join(dir, 'mm.csv'), 'w') as f:
                         for module_id, module_bmi in module_map.items():
                             f.write('%s %s\n' % (module_id, module_bmi))
+                elif self.args.toolset == 'clang':
+                    with open(os.path.join(dir, 'mm.txt'), 'w') as f:
+                        for module_id, module_bmi in module_map.items():
+                            f.write('-fmodule-file=%s=%s\n' %
+                                    (module_id, module_bmi))
         return modules_levels
 
     def __run_modules__(self, levels):
@@ -371,42 +383,73 @@ class Test(Main):
             print('MODULES_LEVELS:')
             pprint.pprint(levels)
         jobs = 0
+        pool = multiprocessing.Pool(processes=int(self.args.jobs))
         for level in levels:
             jobs += len(level)
-            pool = multiprocessing.Pool(processes=int(self.args.jobs))
             pool.map(__pool_function__,
-                     [[self, '__compile_module__', m] for m in level])
-            pool.close()
-            pool.join()
+                     [[self, '__compile_module__', m] for m in level],
+                     chunksize=1)
+        pool.close()
+        pool.join()
         return float(jobs)/float(len(levels))
 
     # CXX -fmodules-ts m0.mpp -c -O0 -x c++
     def __compile_module__(self, m):
         with PushDir(os.path.dirname(m)) as dir:
-            cc = [
-                self.cxx,
-                '-fmodules-ts', '-c', '-O0', '-x', 'c++',
-                os.path.basename(m)]
-            if self.args.use_mapper_file:
-                cc.append('-fmodule-mapper=%s' % (os.path.join(dir, 'mm.csv')))
-            if self.args.use_std:
-                cc.extend(['-I', os.path.join(self.dir, '..', 'std-modules')])
-            cc.extend([
-                # '-fmodule-lazy',
-                # '-fmodule-only',
-            ])
+            cc_pre = None
+            cc = None
+            if self.args.toolset == 'gcc':
+                cc = [
+                    self.cxx,
+                    '-fmodules-ts', '-c', '-std=c++2a', '-O0',
+                    '-x', 'c++',
+                    '-fmodule-mapper=%s' % (os.path.join(dir, 'mm.csv')),
+                    os.path.basename(m)]
+                if self.args.use_std:
+                    cc.extend(
+                        ['-I', os.path.join(self.dir, '..', 'std-modules')])
+                cc.extend([
+                    # '-fmodule-lazy',
+                    # '-fmodule-only',
+                ])
+            elif self.args.toolset == 'clang':
+                cc_pre = [
+                    self.cxx,
+                    '-fmodules-ts', '-c', '-std=c++2a', '-O0',
+                    '-x', 'c++-module',
+                    '--precompile',
+                    f'-fprebuilt-module-path={dir}',
+                    f'{dir}/mm.txt',
+                    '-o', f'{dir}/{os.path.basename(m)}.pcm']
+                cc = [
+                    self.cxx,
+                    '-fmodules-ts', '-c', '-std=c++2a', '-O0',
+                    '-x', 'c++',
+                    f'-fprebuilt-module-path={dir}',
+                    f'{dir}/{os.path.basename(m)}.pcm',
+                    f'{dir}/mm.txt',
+                    '-o', f'{dir}/{os.path.basename(m)}.o']
+                if self.args.use_std:
+                    cc.extend(
+                        ['-I', os.path.join(self.dir, '..', 'std-modules')])
+                cc.extend([
+                    # '-fmodule-lazy',
+                    # '-fmodule-only',
+                ])
             if self.args.debug:
                 sleep(random.uniform(0.0, 0.1))
                 print('C++: "%s"' % ('" "'.join(cc)))
             else:
                 t0 = default_timer()
-                self.__check_call__(cc)
+                if cc_pre:
+                    self.__check_call__(cc_pre)
+                if cc:
+                    self.__check_call__(cc)
                 t1 = default_timer()
                 if self.args.trace:
-                    print('C++: "%s" => %s' % ('" "'.join(cc), t1-t0))
+                    print('C++ => %s\n\t"{s}"\n\t"{s}"' % (t1-t0, '" "'.join(cc_pre), '" "'.join(cc)))
 
     __module_template__ = '''\
-module;
 {c_includes}
 export module {id};
 {std_includes}
@@ -433,6 +476,9 @@ import {id};
             module_exports, '''export int n = 0;''')
         for c in self.cpp_code:
             module_size += Test.__append__(module_exports, c)
+        c_includes = self.c_includes
+        if len(c_includes) > 0:
+            c_includes = ['module;']+c_includes
         module_source = self.__module_template__.format(
             id=id,
             c_includes='\n'.join(self.c_includes),
@@ -497,7 +543,7 @@ import {id};
         with PushDir(os.path.dirname(m)):
             cc = [
                 self.cxx,
-                '-c', '-O0', '-x', 'c++',
+                '-c', '-std=c++2a', '-O0', '-x', 'c++',
                 os.path.basename(m)
             ]
             if self.args.debug:
