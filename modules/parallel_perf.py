@@ -387,14 +387,17 @@ class Test(Main):
         for level in levels:
             jobs += len(level)
             pool.map(__pool_function__,
-                     [[self, '__compile_module__', m] for m in level],
+                     [[self, '__compile_module__', m, True] for m in level],
                      chunksize=1)
+            pool.map_async(__pool_function__,
+                           [[self, '__compile_module__', m] for m in level],
+                           chunksize=1)
         pool.close()
         pool.join()
         return float(jobs)/float(len(levels))
 
     # CXX -fmodules-ts m0.mpp -c -O0 -x c++
-    def __compile_module__(self, m):
+    def __compile_module__(self, m, pre=False):
         with PushDir(os.path.dirname(m)) as dir:
             cc_pre = None
             cc = None
@@ -413,29 +416,31 @@ class Test(Main):
                     # '-fmodule-only',
                 ])
             elif self.args.toolset == 'clang':
-                cc_pre = [
-                    self.cxx,
-                    '-fmodules-ts', '-c', '-std=c++2a', '-O0',
-                    '-x', 'c++-module',
-                    '--precompile',
-                    f'-fprebuilt-module-path={dir}',
-                    f'{dir}/mm.txt',
-                    '-o', f'{dir}/{os.path.basename(m)}.pcm']
-                cc = [
-                    self.cxx,
-                    '-fmodules-ts', '-c', '-std=c++2a', '-O0',
-                    '-x', 'c++',
-                    f'-fprebuilt-module-path={dir}',
-                    f'{dir}/{os.path.basename(m)}.pcm',
-                    f'{dir}/mm.txt',
-                    '-o', f'{dir}/{os.path.basename(m)}.o']
-                if self.args.use_std:
-                    cc.extend(
-                        ['-I', os.path.join(self.dir, '..', 'std-modules')])
-                cc.extend([
-                    # '-fmodule-lazy',
-                    # '-fmodule-only',
-                ])
+                if pre:
+                    cc_pre = [
+                        self.cxx,
+                        '-fmodules-ts', '-c', '-std=c++2a', '-O0',
+                        '-x', 'c++-module',
+                        '--precompile',
+                        f'-fprebuilt-module-path={dir}',
+                        f'@{dir}/mm.txt',
+                        '-o', f'{dir}/{os.path.basename(m)}.pcm',
+                        os.path.basename(m)]
+                else:
+                    cc = [
+                        self.cxx,
+                        '-fmodules-ts', '-c', '-std=c++2a', '-O0',
+                        f'-fprebuilt-module-path={dir}',
+                        f'{dir}/{os.path.basename(m)}.pcm',
+                        f'@{dir}/mm.txt',
+                        '-o', f'{dir}/{os.path.basename(m)}.o']
+                    if self.args.use_std:
+                        cc.extend(
+                            ['-I', os.path.join(self.dir, '..', 'std-modules')])
+                    cc.extend([
+                        # '-fmodule-lazy',
+                        # '-fmodule-only',
+                    ])
             if self.args.debug:
                 sleep(random.uniform(0.0, 0.1))
                 print('C++: "%s"' % ('" "'.join(cc)))
