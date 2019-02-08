@@ -15,6 +15,7 @@ import pprint
 import random
 import re
 import shutil
+import ninja_syntax
 from subprocess import check_call, call, check_output
 from time import sleep
 from timeit import default_timer
@@ -162,6 +163,9 @@ class Test(Main):
         parser.add_argument(
             '--toolset', default='gcc',
             help='Which toolset to run tests for. Can be one or more of: gcc, clang.')
+        parser.add_argument(
+            '--use-ninja', default=False, action='store_true',
+            help='Use ninja rather than python to run the compiler (currently clang only)')
 
     def __run__(self):
         self.dir = os.getcwd()
@@ -218,7 +222,14 @@ class Test(Main):
                         run_time = []
                         for _ in range(self.args.run_samples):
                             t0 = default_timer()
-                            run_dag_jobs.append(run_x(x))
+                            if self.args.use_ninja:
+                                with PushDir(os.path.dirname(x[0][0])) as dir:
+                                    self.__check_call__(['ninja',
+                                                         '-f', os.path.join(dir, 'build.ninja'),
+                                                         '-j', str(self.args.jobs)])
+                                run_dag_jobs.append(math.nan) #???
+                            else:
+                                run_dag_jobs.append(run_x(x))
                             run_time.append(default_timer()-t0)
                         run_time.sort()
                         if len(run_time) >= 5:
@@ -334,6 +345,18 @@ class Test(Main):
                     os.path.join(dir, 'std.io.mpp'),
                 ])
         with PushDir(self.args.dir) as dir:
+            ninja_file = open(os.path.join(dir, 'build.ninja'), 'w')
+            ninja = ninja_syntax.Writer(ninja_file, width=100)
+
+            ninja.variable('CXXFLAGS', f'-fmodules-ts -c -std=c++2a -O0 "@{dir}/mm.txt"')
+            ninja.rule('CXX',
+                command = f'"{self.cxx}" $CXXFLAGS $in -o $out',
+                description = 'CXX $out')
+
+            ninja.rule('CXX-BMI',
+                command = f'"{self.cxx}" $CXXFLAGS -x c++-module --precompile $in -o $out',
+                description = 'CXX-BMI $out')
+
             dag_deps = {}
             module_map = {}
             for dag_level in dag_levels:
@@ -346,15 +369,20 @@ class Test(Main):
             for n in range(int(self.args.count)):
                 module_id = 'm%s' % (n)
                 module_mxx = os.path.join(dir, module_id + '.mpp')
+                module_obj   = os.path.join(dir, module_id + '.o')
                 module_bmi = None
                 if self.args.toolset == 'gcc':
                     module_bmi = os.path.join(dir, module_id + '.gcm')
                 elif self.args.toolset == 'clang':
-                    module_bmi = os.path.join(dir, module_id + '.mpp.pcm')
+                    module_bmi = os.path.join(dir, module_id + '.pcm')
                 module_deps = ['m%s' % (n) for n in dag_deps[n]]
                 module_source = self.__make_module_source__(
                     module_id, module_deps)
                 module_map[module_id] = module_bmi
+                ninja.build(module_obj, 'CXX', module_bmi)
+                ninja.default(module_obj)
+                ninja.build(module_bmi, 'CXX-BMI', module_mxx,
+                            implicit=[os.path.join(dir, dep + '.pcm') for dep in module_deps])
                 if self.args.debug:
                     print('FILE: %s' % (module_mxx))
                     print(module_source)
@@ -422,7 +450,6 @@ class Test(Main):
                         '-fmodules-ts', '-c', '-std=c++2a', '-O0',
                         '-x', 'c++-module',
                         '--precompile',
-                        f'-fprebuilt-module-path={dir}',
                         f'@{dir}/mm.txt',
                         '-o', f'{dir}/{os.path.basename(m)}.pcm',
                         os.path.basename(m)]
@@ -430,7 +457,6 @@ class Test(Main):
                     cc = [
                         self.cxx,
                         '-fmodules-ts', '-c', '-std=c++2a', '-O0',
-                        f'-fprebuilt-module-path={dir}',
                         f'{dir}/{os.path.basename(m)}.pcm',
                         f'@{dir}/mm.txt',
                         '-o', f'{dir}/{os.path.basename(m)}.o']
@@ -501,6 +527,14 @@ import {id};
         levels = []
         id_t = 'h%s'
         with PushDir(self.args.dir) as dir:
+            ninja_file = open(os.path.join(dir, 'build.ninja'), 'w')
+            ninja = ninja_syntax.Writer(ninja_file, width=100)
+
+            ninja.variable('CXXFLAGS', '-c -std=c++2a -O0 -x c++')
+            ninja.rule('CXX',
+                command = f'"{self.cxx}" $CXXFLAGS $in -o $out',
+                description = 'CXX $out')
+
             dag_deps = {}
             level = []
             for dag_level in dag_levels:
@@ -513,8 +547,11 @@ import {id};
                 id = id_t % (n)
                 hpp = os.path.join(dir, id + '.hpp')
                 cpp = os.path.join(dir, id + '.cpp')
+                obj = os.path.join(dir, id + '.o')
                 deps = [id_t % (n) for n in dag_deps[n]]
                 source = self.__make_headers_source__(id, deps)
+                ninja.build(obj, 'CXX', cpp)
+                ninja.default(obj)
                 if self.args.debug:
                     print('FILE: %s' % (hpp))
                     print(source[0])
