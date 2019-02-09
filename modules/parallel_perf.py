@@ -408,13 +408,15 @@ class Test(Main):
             ninja = ninja_syntax.Writer(ninja_file, width=100)
 
             ninja.variable(
-                'CXXFLAGS', f'-fmodules-ts -c -std=c++2a -O0 "@{dir}/mm.txt"')
+                'CXXFLAGS', '-fmodules-ts -c -std=c++2a -O0 "@{dir}/mm.txt"'.format(dir=dir))
             ninja.rule('CXX',
-                       command=f'"{self.cxx}" $CXXFLAGS $in -o $out',
+                       command='"{cxx}" $CXXFLAGS $in -o $out'.format(
+                           cxx=self.cxx),
                        description='CXX $out')
 
             ninja.rule('CXX-BMI',
-                       command=f'"{self.cxx}" $CXXFLAGS -x c++-module --precompile $in -o $out',
+                       command='"{cxx}" $CXXFLAGS -x c++-module --precompile $in -o $out'.format(
+                           cxx=self.cxx),
                        description='CXX-BMI $out')
 
             dag_deps = {}
@@ -427,17 +429,17 @@ class Test(Main):
                     if self.args.toolset == 'gcc':
                         executor.add_task(
                             [self.__compile_module__, module_mxx, False],
-                            f'{m["index"]}',
-                            [f'{d}' for d in m['deps']])
+                            str(m["index"]),
+                            [str(d) for d in m['deps']])
                     elif self.args.toolset == 'clang':
                         executor.add_task(
                             [self.__compile_module__, module_mxx, True],
-                            f'{m["index"]}-pre',
-                            [f'{d}-pre' for d in m['deps']])
+                            str(m["index"])+'-pre',
+                            [str(d)+'-pre' for d in m['deps']])
                         executor.add_task(
                             [self.__compile_module__, module_mxx, False],
-                            f'{m["index"]}',
-                            [f'{d}-pre' for d in m['deps']])
+                            str(m["index"]),
+                            [str(d)+'-pre' for d in m['deps']])
 
             module_map = {}
             for n in range(int(self.args.count)):
@@ -514,16 +516,16 @@ class Test(Main):
                         '-fmodules-ts', '-c', '-std=c++2a', '-O0',
                         '-x', 'c++-module',
                         '--precompile',
-                        f'@{dir}/mm.txt',
-                        '-o', f'{dir}/{os.path.basename(m)}.pcm',
+                        '@{dir}/mm.txt'.format(dir=dir),
+                        '-o', '{dir}/{os.path.basename(m)}.pcm'.format(dir=dir),
                         os.path.basename(m)]
                 else:
                     cc = [
                         self.cxx,
                         '-fmodules-ts', '-c', '-std=c++2a', '-O0',
-                        f'{dir}/{os.path.basename(m)}.pcm',
-                        f'@{dir}/mm.txt',
-                        '-o', f'{dir}/{os.path.basename(m)}.o']
+                        '{dir}/{os.path.basename(m)}.pcm'.format(dir=dir),
+                        '@{dir}/mm.txt'.format(dir=dir),
+                        '-o', '{dir}/{os.path.basename(m)}.o'.format(dir=dir)]
                     if self.args.use_std:
                         cc.extend(
                             ['-I', os.path.join(self.dir, '..', 'std-modules')])
@@ -586,7 +588,8 @@ import {id};
 
             ninja.variable('CXXFLAGS', '-c -std=c++2a -O0 -x c++')
             ninja.rule('CXX',
-                       command=f'"{self.cxx}" $CXXFLAGS $in -o $out',
+                       command='"{cxx}" $CXXFLAGS $in -o $out'.format(
+                           cxx=self.cxx),
                        description='CXX $out')
 
             dag_deps = {}
