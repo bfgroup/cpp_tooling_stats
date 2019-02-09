@@ -6,6 +6,7 @@
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 """
 import argparse
+import copy
 import json
 import math
 import multiprocessing
@@ -19,6 +20,7 @@ import ninja_syntax
 from subprocess import check_call, call, check_output
 from time import sleep
 from timeit import default_timer
+import threading
 
 
 def roundi(f):
@@ -107,6 +109,61 @@ class PushDir():
         os.chdir(self.cwd)
 
 
+class Executor(object):
+    def __init__(self, processes):
+        self.__command_deps__ = {}
+        self.__command__ = {}
+        self.__processes__ = int(processes)
+        self.__pool__ = None
+        self.__lock__ = threading.Lock()
+
+    def copy(self):
+        o = Executor(self.__processes__)
+        o.__command_deps__ = copy.deepcopy(self.__command_deps__)
+        o.__command__ = copy.copy(self.__command__)
+        o.__lock__ = threading.Lock()
+        return o
+
+    def add_task(self, command, id, deps):
+        self.__lock__.acquire()
+        self.__command__[id] = command
+        self.__command_deps__[id] = set(deps)
+        self.__lock__.release()
+
+    def run(self):
+        self.__pool__ = [threading.Thread(
+            target=self.next_command) for x in range(self.__processes__)]
+        for t in self.__pool__:
+            t.start()
+        for t in self.__pool__:
+            t.join()
+
+    def next_command(self):
+        c = self.pick_command()
+        while c:
+            c[1][0](*c[1][1:])
+            self.complete_command(c[0])
+            c = self.pick_command()
+
+    def pick_command(self):
+        result = None
+        self.__lock__.acquire()
+        for id, command in self.__command__.items():
+            if len(self.__command_deps__[id]) == 0:
+                result = (id, command)
+                break
+        if result:
+            del self.__command__[id]
+        self.__lock__.release()
+        return result
+
+    def complete_command(self, id):
+        self.__lock__.acquire()
+        for k in self.__command_deps__.keys():
+            self.__command_deps__[k].discard(id)
+        self.__lock__.release()
+
+
 class Test(Main):
     def __init_parser__(self, parser):
         parser.add_argument(
@@ -184,8 +241,6 @@ class Test(Main):
             self.args.kind = args_kind
             sample = test_x()
             data.append(sample)
-            # pprint.pprint(sample)
-        pprint.pprint(data)
         json_data = [["dag_depth", "headers", "modules"]]
         for d in data:
             data_row = [d['dag_depth']]
@@ -225,11 +280,12 @@ class Test(Main):
                             if self.args.use_ninja:
                                 with PushDir(os.path.dirname(x[0][0])) as dir:
                                     self.__check_call__(['ninja',
-                                                         '-f', os.path.join(dir, 'build.ninja'),
+                                                         '-f', os.path.join(
+                                                             dir, 'build.ninja'),
                                                          '-j', str(self.args.jobs)])
-                                run_dag_jobs.append(math.nan) #???
+                                run_dag_jobs.append(math.nan)  # ???
                             else:
-                                run_dag_jobs.append(run_x(x))
+                                run_dag_jobs.append(run_x(x.copy()))
                             run_time.append(default_timer()-t0)
                         run_time.sort()
                         if len(run_time) >= 5:
@@ -241,6 +297,7 @@ class Test(Main):
                         print("KIND: %s, DEPTH: %s JOBS: %s => %s" %
                               (kind, self.args.dag_depth,
                                result['dag_jobs_'+kind], result[kind]))
+        self.args.dir = args_dir
         return result
 
     __std_includes__ = [
@@ -318,9 +375,11 @@ class Test(Main):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ MODULES...
 
     def __generate_modules__(self):
-        with PushDir(self.args.dir) as dir:
-            shutil.rmtree(dir)
+        if os.path.exists(self.args.dir):
+            shutil.rmtree(self.args.dir)
+            os.makedirs(self.args.dir)
         dag_levels = self.__generate_dag__()
+        executor = Executor(self.args.jobs)
         modules_levels = []
         if self.args.use_std:
             std_modules_dir = os.path.join(
@@ -348,28 +407,43 @@ class Test(Main):
             ninja_file = open(os.path.join(dir, 'build.ninja'), 'w')
             ninja = ninja_syntax.Writer(ninja_file, width=100)
 
-            ninja.variable('CXXFLAGS', f'-fmodules-ts -c -std=c++2a -O0 "@{dir}/mm.txt"')
+            ninja.variable(
+                'CXXFLAGS', f'-fmodules-ts -c -std=c++2a -O0 "@{dir}/mm.txt"')
             ninja.rule('CXX',
-                command = f'"{self.cxx}" $CXXFLAGS $in -o $out',
-                description = 'CXX $out')
+                       command=f'"{self.cxx}" $CXXFLAGS $in -o $out',
+                       description='CXX $out')
 
             ninja.rule('CXX-BMI',
-                command = f'"{self.cxx}" $CXXFLAGS -x c++-module --precompile $in -o $out',
-                description = 'CXX-BMI $out')
+                       command=f'"{self.cxx}" $CXXFLAGS -x c++-module --precompile $in -o $out',
+                       description='CXX-BMI $out')
 
             dag_deps = {}
-            module_map = {}
             for dag_level in dag_levels:
-                modules_level = []
                 for m in dag_level:
                     dag_deps[m['index']] = m['deps']
-                    modules_level.append(os.path.join(
-                        dir, 'm%s' % (m['index']) + '.mpp'))
-                modules_levels.append(modules_level)
+
+                    module_id = 'm%s' % (m['index'])
+                    module_mxx = os.path.join(dir, module_id + '.mpp')
+                    if self.args.toolset == 'gcc':
+                        executor.add_task(
+                            [self.__compile_module__, module_mxx, False],
+                            f'{m["index"]}',
+                            [f'{d}' for d in m['deps']])
+                    elif self.args.toolset == 'clang':
+                        executor.add_task(
+                            [self.__compile_module__, module_mxx, True],
+                            f'{m["index"]}-pre',
+                            [f'{d}-pre' for d in m['deps']])
+                        executor.add_task(
+                            [self.__compile_module__, module_mxx, False],
+                            f'{m["index"]}',
+                            [f'{d}-pre' for d in m['deps']])
+
+            module_map = {}
             for n in range(int(self.args.count)):
                 module_id = 'm%s' % (n)
                 module_mxx = os.path.join(dir, module_id + '.mpp')
-                module_obj   = os.path.join(dir, module_id + '.o')
+                module_obj = os.path.join(dir, module_id + '.o')
                 module_bmi = None
                 if self.args.toolset == 'gcc':
                     module_bmi = os.path.join(dir, module_id + '.gcm')
@@ -390,8 +464,11 @@ class Test(Main):
                 else:
                     with open(module_mxx, 'w') as f:
                         f.write(module_source)
+
+            ninja_file.close()
+
             if self.args.debug:
-                print('MAP: %s' % (mapper_file))
+                print('MAP: %s' % (os.path.join(dir, 'mm.*')))
                 pprint.pprint(module_map)
                 print('-----')
             else:
@@ -404,48 +481,35 @@ class Test(Main):
                         for module_id, module_bmi in module_map.items():
                             f.write('-fmodule-file=%s=%s\n' %
                                     (module_id, module_bmi))
-        return modules_levels
+        return executor
 
-    def __run_modules__(self, levels):
-        if self.args.trace:
-            print('MODULES_LEVELS:')
-            pprint.pprint(levels)
-        jobs = 0
-        pool = multiprocessing.Pool(processes=int(self.args.jobs))
-        for level in levels:
-            jobs += len(level)
-            pool.map(__pool_function__,
-                     [[self, '__compile_module__', m, True] for m in level],
-                     chunksize=1)
-            pool.map_async(__pool_function__,
-                           [[self, '__compile_module__', m] for m in level],
-                           chunksize=1)
-        pool.close()
-        pool.join()
-        return float(jobs)/float(len(levels))
+    def __run_modules__(self, executor):
+        with PushDir(self.args.dir):
+            executor.run()
+        return 0
 
     # CXX -fmodules-ts m0.mpp -c -O0 -x c++
     def __compile_module__(self, m, pre=False):
         with PushDir(os.path.dirname(m)) as dir:
-            cc_pre = None
-            cc = None
+            cc = []
             if self.args.toolset == 'gcc':
-                cc = [
-                    self.cxx,
-                    '-fmodules-ts', '-c', '-std=c++2a', '-O0',
-                    '-x', 'c++',
-                    '-fmodule-mapper=%s' % (os.path.join(dir, 'mm.csv')),
-                    os.path.basename(m)]
-                if self.args.use_std:
-                    cc.extend(
-                        ['-I', os.path.join(self.dir, '..', 'std-modules')])
-                cc.extend([
-                    # '-fmodule-lazy',
-                    # '-fmodule-only',
-                ])
+                if not pre:
+                    cc = [
+                        self.cxx,
+                        '-fmodules-ts', '-c', '-std=c++2a', '-O0',
+                        '-x', 'c++',
+                        '-fmodule-mapper=%s' % (os.path.join(dir, 'mm.csv')),
+                        os.path.basename(m)]
+                    if self.args.use_std:
+                        cc.extend(
+                            ['-I', os.path.join(self.dir, '..', 'std-modules')])
+                    cc.extend([
+                        # '-fmodule-lazy',
+                        # '-fmodule-only',
+                    ])
             elif self.args.toolset == 'clang':
                 if pre:
-                    cc_pre = [
+                    cc = [
                         self.cxx,
                         '-fmodules-ts', '-c', '-std=c++2a', '-O0',
                         '-x', 'c++-module',
@@ -463,22 +527,12 @@ class Test(Main):
                     if self.args.use_std:
                         cc.extend(
                             ['-I', os.path.join(self.dir, '..', 'std-modules')])
-                    cc.extend([
-                        # '-fmodule-lazy',
-                        # '-fmodule-only',
-                    ])
             if self.args.debug:
                 sleep(random.uniform(0.0, 0.1))
                 print('C++: "%s"' % ('" "'.join(cc)))
             else:
-                t0 = default_timer()
-                if cc_pre:
-                    self.__check_call__(cc_pre)
                 if cc:
                     self.__check_call__(cc)
-                t1 = default_timer()
-                if self.args.trace:
-                    print('C++ => %s\n\t"{s}"\n\t"{s}"' % (t1-t0, '" "'.join(cc_pre), '" "'.join(cc)))
 
     __module_template__ = '''\
 {c_includes}
@@ -524,7 +578,7 @@ import {id};
         with PushDir(self.args.dir) as dir:
             shutil.rmtree(dir)
         dag_levels = self.__generate_dag__()
-        levels = []
+        executor = Executor(self.args.jobs)
         id_t = 'h%s'
         with PushDir(self.args.dir) as dir:
             ninja_file = open(os.path.join(dir, 'build.ninja'), 'w')
@@ -532,17 +586,18 @@ import {id};
 
             ninja.variable('CXXFLAGS', '-c -std=c++2a -O0 -x c++')
             ninja.rule('CXX',
-                command = f'"{self.cxx}" $CXXFLAGS $in -o $out',
-                description = 'CXX $out')
+                       command=f'"{self.cxx}" $CXXFLAGS $in -o $out',
+                       description='CXX $out')
 
             dag_deps = {}
-            level = []
             for dag_level in dag_levels:
                 for m in dag_level:
+                    m_cpp = os.path.join(dir, id_t % (m['index']) + '.cpp')
+                    executor.add_task(
+                        [self.__compile_headers__, m_cpp],
+                        m['index'],
+                        [])
                     dag_deps[m['index']] = m['deps']
-                    level.append(os.path.join(
-                        dir, id_t % (m['index']) + '.cpp'))
-            levels.append(level)
             for n in range(int(self.args.count)):
                 id = id_t % (n)
                 hpp = os.path.join(dir, id + '.hpp')
@@ -564,21 +619,12 @@ import {id};
                         f.write(source[0])
                     with open(cpp, 'w') as f:
                         f.write(source[1])
-        return levels
+        return executor
 
-    def __run_headers__(self, levels):
-        if self.args.trace:
-            print('LEVELS:')
-            pprint.pprint(levels)
-        jobs = 0
-        for level in levels:
-            jobs += len(level)
-            pool = multiprocessing.Pool(processes=int(self.args.jobs))
-            pool.map(__pool_function__,
-                     [[self, '__compile_headers__', m] for m in level])
-            pool.close()
-            pool.join()
-        return float(jobs)/float(len(levels))
+    def __run_headers__(self, executor):
+        with PushDir(self.args.dir):
+            executor.run()
+        return 0
 
     # CXX m0.mpp -c -O0 -x c++
     def __compile_headers__(self, m):
@@ -712,7 +758,6 @@ def __pool_function__(x):
 
 # D1441R1
 # ./parallel_perf.py --dir=/Users/grafik/devcache/cpp_stats --def-ints --dag-depth=1,151 --jobs=8 --json-out=data.json
-# ./parallel_perf.py --dir=/Users/grafik/devcache/cpp_stats --def-ints --dag-depth=1,151 --jobs=8 --json-out=data-mm.json --use-mapper-file
 
 if __name__ == "__main__":
     Test()
