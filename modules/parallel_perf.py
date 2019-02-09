@@ -439,7 +439,7 @@ class Test(Main):
                         executor.add_task(
                             [self.__compile_module__, module_mxx, False],
                             str(m["index"]),
-                            [str(d)+'-pre' for d in m['deps']])
+                            [str(d)+'-pre' for d in m['deps']+[str(m["index"])]])
 
             module_map = {}
             for n in range(int(self.args.count)):
@@ -492,7 +492,9 @@ class Test(Main):
 
     # CXX -fmodules-ts m0.mpp -c -O0 -x c++
     def __compile_module__(self, m, pre=False):
-        with PushDir(os.path.dirname(m)) as dir:
+        m_dir = os.path.dirname(m)
+        m_base = os.path.splitext(os.path.basename(m))[0]
+        with PushDir(m_dir) as dir:
             cc = []
             if self.args.toolset == 'gcc':
                 if not pre:
@@ -501,7 +503,7 @@ class Test(Main):
                         '-fmodules-ts', '-c', '-std=c++2a', '-O0',
                         '-x', 'c++',
                         '-fmodule-mapper=%s' % (os.path.join(dir, 'mm.csv')),
-                        os.path.basename(m)]
+                        m_base+'.mpp']
                     if self.args.use_std:
                         cc.extend(
                             ['-I', os.path.join(self.dir, '..', 'std-modules')])
@@ -517,18 +519,21 @@ class Test(Main):
                         '-x', 'c++-module',
                         '--precompile',
                         '@{dir}/mm.txt'.format(dir=dir),
-                        '-o', '{dir}/{os.path.basename(m)}.pcm'.format(dir=dir),
+                        '-o', '{dir}/{name}.pcm'.format(dir=dir,
+                                                        name=m_base),
                         os.path.basename(m)]
                 else:
                     cc = [
                         self.cxx,
                         '-fmodules-ts', '-c', '-std=c++2a', '-O0',
-                        '{dir}/{os.path.basename(m)}.pcm'.format(dir=dir),
+                        '{dir}/{name}.pcm'.format(dir=dir,
+                                                  name=m_base),
                         '@{dir}/mm.txt'.format(dir=dir),
-                        '-o', '{dir}/{os.path.basename(m)}.o'.format(dir=dir)]
+                        '-o', '{dir}/{name}.o'.format(dir=dir, name=m_base)]
                     if self.args.use_std:
                         cc.extend(
-                            ['-I', os.path.join(self.dir, '..', 'std-modules')])
+                            ['-I',
+                                os.path.join(self.dir, '..', 'std-modules')])
             if self.args.debug:
                 sleep(random.uniform(0.0, 0.1))
                 print('C++: "%s"' % ('" "'.join(cc)))
