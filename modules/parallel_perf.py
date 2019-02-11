@@ -573,7 +573,7 @@ import {id};
             c_includes = ['module;']+c_includes
         module_source = self.__module_template__.format(
             id=id,
-            c_includes='\n'.join(self.c_includes),
+            c_includes='\n'.join(c_includes),
             std_includes='\n'.join(self.std_includes),
             imports=''.join(module_imports),
             exports='\n'.join(module_exports))
