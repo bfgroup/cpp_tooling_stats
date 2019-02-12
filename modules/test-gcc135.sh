@@ -22,6 +22,6 @@ python ./parallel_perf.py ${OPTS} --jobs=80 --json-out=data/gcc135-150-j080-clan
 python ./parallel_perf.py ${OPTS} --jobs=96 --json-out=data/gcc135-150-j096-clang.json --toolset=clang
 python ./parallel_perf.py ${OPTS} --jobs=128 --json-out=data/gcc135-150-j128-clang.json --toolset=clang
 
-OPTS="--dir=/home/grafik/temp/cpp_stats --def-ints --jobs=128 --json-out=/home/grafik/temp/cpp_stats/data.json --toolset=clang"
+OPTS="--dir=/home/grafik/temp/cpp_stats --def-ints --jobs=128 --json-out=/home/grafik/temp/cpp_stats/data.json --toolset=clang --run-samples=1"
 python ./parallel_perf.py ${OPTS} --exec-stats=data/gcc135-150-j128-d020-clang-stat-modules.json --dag-depth=20 --kind=modules
 python ./parallel_perf.py ${OPTS} --exec-stats=data/gcc135-150-j128-d020-clang-stat-headers.json --dag-depth=20 --kind=headers
