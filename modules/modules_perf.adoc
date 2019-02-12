@@ -30,6 +30,7 @@ ifdef::backend-html5[]
 include::std.css[]
 </style>
 <script src="echarts.min.js"></script>
+<script src="build_chart.js"></script>
 ++++
 endif::[]
 
@@ -51,7 +52,10 @@ Fix bug in test generation and DAG calculation that resulted in non-uniform
 growth in the modular test times. Fix grammatical errors. Ran tests on a high
 CPU machine from the GCC Farm Project. Additional data of parallel building
 from higher thread and faster hardware, thanks to Robert Maynard for running
-the tests and for the GCC Compile Farm for access to their machines.
+the tests and for the GCC Compile Farm for access to their machines. Replaced
+simple level based scheduler with a full parallel DAG executor to avoid
+CPU underutilization. Support for Clang 7.0.1 module compilation for alternate
+data.
 
 === R0 (Initial)
 
@@ -92,11 +96,12 @@ chain depth against equivalent non-modular source.
 Overall we perform the basic task of compiling 150 {CPP} source files into
 corresponding object files only. We perform the compile at different dependency
 DAG chain depth counts. Each source depends, either as an `import` or
-`#include`, on some number of sources (headers or modules) from all the
-previous DAG levels. The overall time to compile all 150 files is taken
-as the result of the measurements. An important observation is that at the
-highest DAG depth the arrangement creates a completely linear dependency
-chain.
+`#include`, on some number of sources (headers or modules) from the
+previous DAG levels. Which means that at DAG level 150 each source depends on
+at least the one source from the previous DAG level. The overall wall clock
+time to compile all 150 files is taken as the result of the measurements.
+An important observation is that at the highest DAG depth the arrangement
+creates a completely linear dependency chain.
 
 ==== Modular Source
 
@@ -196,24 +201,42 @@ This test has some real-life limitations borne out of the software and hardware
 used for testing. Some of these limitations were discovered through
 experimentation, for example with internal compiler errors.
 
-Being an experimental compiler the support for compiling modules is fragile and
-placed severe limits on what the modular sources could contain. Most current
-{CPP} constructs fail to compile reliably, for example templates, and cause ICEs.
-This is why the generated sources only contain `int` variable definitions.
+Being an experimental language feature the support for compiling modules is
+fragile and placed severe limits on what the modular sources could contain:
 
-Along that same line the current modular compiler also seems to have stability
-limits on how many imports can be done. This is why only a maximum of three (3)
-`import` statements are included in the source. As the compiler errors with
-four (4) or more `import` statements.
+* Most current {CPP} constructs fail to compile reliably on GCC, for example
+  templates, and cause ICEs. This is why the generated sources only contain
+  `int` variable definitions.
 
-Not to be outdone, compiling the header test also has one limitation. The
-compiler has a hard limit of number of include header depth of 150. Which is
-why the tests only cover up to 150 files and consequently a matching DAG depth.
+* Along that same line the current GCC modular compiler also seems to have
+  stability limits on how many imports can be done. This is why only a maximum
+  of three (3) `import` statements are included in the source. As the compiler
+  errors with four (4) or more `import` statements.
+
+* Not to be outdone, compiling the header test also has one limitation. The
+  GCC and Clang compilers have a hard limit of number of include header depth
+  of 150. Which is why the tests only cover up to 150 files and consequently a
+  matching DAG depth.
+
+* The Clang compiler does not implement the merged modules proposal. Which
+  means we avoid features like the global fragment module when generating test
+  source.
+
+* The Clang compiler uses two stages for modules. One to generate the BMI and
+  another to generate the object code. This potentially increases the amount
+  of parallelism but also increases the number of processes that need to run.
 
 This is a simulation with "perfect" build knowledge as all dependency and source
 information is known before building starts. Hence it is only a very rough
 approximation of reality where build system have to deal with dependency
 discovery while building and in the face of generated source files.
+
+The executor that schedules build commands is greedy and executes the first
+available task as soon as there's a slot for it.
+
+There is some amount of overhead on the Python side for running the threads
+in the executor. But this is stable through the lifetime of each test rune,
+and hence can be ignored as we only care about relative performance.
 
 ++++
 <div style="page-break-before: always"></div>
@@ -221,113 +244,119 @@ discovery while building and in the face of generated source files.
 
 === Results
 
-++++
-<script type="text/javascript">
-function parallel_build_value_fmt(v) {
-    return Number.parseFloat(v).toFixed(1).toString();
-}
-function create_parallel_build_chart(target, title, data) {
-    var chart = echarts.init(document.getElementById(target));
-    chart.setOption({
-        title: title,
-        legend: { data:['Non-Modular', 'Modular'] },
-        tooltip: {
-            trigger: 'axis',
-            axisPointer: { type: 'shadow' }
-        },
-        xAxis: [ { name: 'DAG Depth', type: 'category', nameLocation: 'center', nameGap: 30 } ],
-        yAxis: [ { name: 'Wall Clock Seconds', type: 'value', nameLocation: 'center', nameGap: 45 } ],
-        series: [
-            {
-                name: 'Non-Modular',
-                type: 'bar',
-                // type: 'pictorialBar', symbol: 'rect',
-                label: { normal: {
-                    show: true, position: 'top', rotate: 90,
-                    align: 'left', verticalAlign: 'middle',
-                    formatter: function (params) { return parallel_build_value_fmt(params.value[1]); }
-                } },
-                encode: { x: 'dag_depth', y: 'headers' },
-            },
-            {
-                name: 'Modular',
-                type: 'bar',
-                // type: 'pictorialBar', symbol: 'roundRect', symbolRepeat: true, symbolSize: ['100%', 5], barGap: '0%',
-                label: { normal: {
-                    show: true, position: 'top', rotate: 90,
-                    align: 'left', verticalAlign: 'middle',
-                    formatter: function (params) { return parallel_build_value_fmt(params.value[2]); }
-                } },
-                encode: { x: 'dag_depth', y: 'modules' },
-                formatter: parallel_build_value_fmt,
-            },
-        ],
-        dataset: { source: data }
-    });
-}
-</script>
-++++
+The charts below use a triangle icon for non-modular builds, and a circle for
+modular builds.
 
 ++++
 <div id="parallel_build" style="height: 400px;"></div>
 <script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
+create_parallel_build_chart_multi(
 'parallel_build',
 {
     text: 'Jobs: 8',
     subtext: 'Coqui: Intel Mobile Core i7 "Haswell/Crystalwell" (I7-4870HQ) @ 2.5GHz (4 physical cores / 8 threads)'
 },
-include::data/coqui-150-j008.json[]
+[
+'GCC',
+include::data/coqui-150-j008-gcc.json[]
+,'Clang',
+include::data/coqui-150-j008-clang.json[]
+]
 );
 </script>
 ++++
 
-As we can see there is an initial performance advantage to modular source
-over non-modular source. This advantage diminishes as the dependency depth
-grows and hence the number of parallel modular source compiles decreases.
-The performance of the non-modular initially climbs quickly as the amount
-of source increases from transitively including more of the headers.
-That increase eventually flattens when each file is including approximately
-the entire source. This happens roughly at the 1/3 point and matches
-having each header include 3 other headers (i.e. at the 150/3 demarcation).
-Whereas the modular continually increases in time inversely proportional
-to the number of parallel builds that can execute per DAG level. Eventually
-reaching linear execution at the highest DAG level of 150 for this test.
+First looking at the GCC performance, the solid lines, we can see that
+modular compiles have a consistent advantage over all DAG depths. Although
+the modular compiles rise slightly at the start they flatten out for most
+of the DAG depths. Whereas the non-modular compiles initially rise
+quickly and then a bit slower. But they still rise over time as more
+source code is consumed from the deepening header inclusions. This
+certainly looks really good for a modular future.
 
-This indicates that as long as we can execute parallel modular compiles at
-the same rate as non-modular compiles it appears that modular compiles have
-a varied but perceptible performance advantage.
+Now, lets look at Clang, the dashed lines, like GCC it starts out
+performing along the same scale of performance at lower DAG depths. But,
+alarmingly, at the 1/3 point it jumps in time to instead, surprisingly,
+follow the GCC non-modular compile performance. While at the same time
+the non-modular Clang compiles perform considerably better, but still
+linear. Another observation worth noting is that at the lower DAG depths
+GCC performs slightly better than Clang. This is likely from Clang test
+doing two compile invocations to generate the equivalent BMI and object
+data.
 
-This also indicates that the larger the number of real parallel builds
-possible the less advantage modular compiles have over non-modular compiles.
+Even with the bad news of Clang at high DAG depths this looks promising.
+Both compilers perform very well at the not high DAG depths and scale
+well as DAG depth increases. But this is at what is considered low
+parallelism levels. Even phones are approaching this level of performance.
 
-Below we are building with an approximately equal per core speed machine. But
-this machine is capable of executing up 128 threads with its 32 physical cores.
+Lets now look at higher levels of parallelism with a machine that has only
+slightly lower CPU core speed but is capable of executing up 128 threads
+with its 32 physical cores. The first sample set is a base line comparison
+at 8 parallel jobs. As we can see it performs comparably with the above
+results. The one big difference is that now GCC non-modular performs better
+than the Clang non-modular builds.
+
+++++
+<div id="parallel_build_gcc135_8" style="height: 400px;"></div>
+<script type="text/javascript">
+create_parallel_build_chart_multi(
+'parallel_build_gcc135_8',
+{
+    text: 'Jobs: 8',
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
+},
+[
+'GCC',
+include::data/gcc135-150-j008-gcc.json[]
+,'Clang',
+include::data/gcc135-150-j008-clang.json[]
+]
+);
+</script>
+++++
+
+We'll now jump to 16 parallel jobs and onward step incrementally 16 jobs at a
+time until we reach the machine thread maximum of 128.
 
 ++++
 <div id="parallel_build_gcc135_16" style="height: 400px;"></div>
 <script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
+create_parallel_build_chart_multi(
 'parallel_build_gcc135_16',
 {
     text: 'Jobs: 16',
     subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
 },
-include::data/gcc135-150-j016.json[]
+[
+'GCC',
+include::data/gcc135-150-j016-gcc.json[]
+,'Clang',
+include::data/gcc135-150-j016-clang.json[]
+]
 );
 </script>
 ++++
 
+Immediately we can see that the non-modular builds roughly half in clock time
+matching the doubling of the available parallelism. And are now very close to
+the performance of GCC modular builds. What is striking is that the modular
+builds don't substantially change from the 8 parallel job case. 
+
 ++++
 <div id="parallel_build_gcc135_32" style="height: 400px;"></div>
 <script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
+create_parallel_build_chart_multi(
 'parallel_build_gcc135_32',
 {
     text: 'Jobs: 32',
     subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
 },
-include::data/gcc135-150-j032.json[]
+[
+'GCC',
+include::data/gcc135-150-j032-gcc.json[]
+,'Clang',
+include::data/gcc135-150-j032-clang.json[]
+]
 );
 </script>
 ++++
@@ -335,27 +364,42 @@ include::data/gcc135-150-j032.json[]
 ++++
 <div id="parallel_build_gcc135_48" style="height: 400px;"></div>
 <script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
+create_parallel_build_chart_multi(
 'parallel_build_gcc135_48',
 {
     text: 'Jobs: 48',
     subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
 },
-include::data/gcc135-150-j048.json[]
+[
+'GCC',
+include::data/gcc135-150-j048-gcc.json[]
+,'Clang',
+include::data/gcc135-150-j048-clang.json[]
+]
 );
 </script>
 ++++
 
+As we can see the increasing number of parallel jobs keeps improving the
+performance of the non-modular builds while the modular builds are
+consistent. By now the non-modular builds are always faster at DAG depths
+43 onward.
+
 ++++
 <div id="parallel_build_gcc135_64" style="height: 400px;"></div>
 <script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
+create_parallel_build_chart_multi(
 'parallel_build_gcc135_64',
 {
     text: 'Jobs: 64',
     subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
 },
-include::data/gcc135-150-j064.json[]
+[
+'GCC',
+include::data/gcc135-150-j064-gcc.json[]
+,'Clang',
+include::data/gcc135-150-j064-clang.json[]
+]
 );
 </script>
 ++++
@@ -363,13 +407,18 @@ include::data/gcc135-150-j064.json[]
 ++++
 <div id="parallel_build_gcc135_80" style="height: 400px;"></div>
 <script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
+create_parallel_build_chart_multi(
 'parallel_build_gcc135_80',
 {
     text: 'Jobs: 80',
     subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
 },
-include::data/gcc135-150-j080.json[]
+[
+'GCC',
+include::data/gcc135-150-j080-gcc.json[]
+,'Clang',
+include::data/gcc135-150-j080-clang.json[]
+]
 );
 </script>
 ++++
@@ -377,13 +426,18 @@ include::data/gcc135-150-j080.json[]
 ++++
 <div id="parallel_build_gcc135_96" style="height: 400px;"></div>
 <script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
+create_parallel_build_chart_multi(
 'parallel_build_gcc135_96',
 {
     text: 'Jobs: 96',
     subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
 },
-include::data/gcc135-150-j096.json[]
+[
+'GCC',
+include::data/gcc135-150-j096-gcc.json[]
+,'Clang',
+include::data/gcc135-150-j096-clang.json[]
+]
 );
 </script>
 ++++
@@ -391,133 +445,139 @@ include::data/gcc135-150-j096.json[]
 ++++
 <div id="parallel_build_gcc135_128" style="height: 400px;"></div>
 <script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
+create_parallel_build_chart_multi(
 'parallel_build_gcc135_128',
 {
     text: 'Jobs: 128',
     subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
 },
-include::data/gcc135-150-j128.json[]
+[
+'GCC',
+include::data/gcc135-150-j128-gcc.json[]
+,'Clang',
+include::data/gcc135-150-j128-clang.json[]
+]
 );
 </script>
 ++++
 
-That shows the postulation above that as the number of parallel compiles
-increases modular builds loose more of their advantage at lower and lower
-DAG depths.
+We've now reached the point where non-modular builds are faster at all DAG
+depths higher than 22. And while the modular builds have stayed the same in
+the face of increasing parallelism, the non-modular builds have gained ground
+at each step.
 
-Below is another series of increasing parallelism. This it's split across
-three different machines and also arranged from fastest to slowest CPU clock
-speeds. The parallelism goes past the maximum of 150 concurrent compiles
-for the last machine.
+// Below is another series of increasing parallelism. This it's split across
+// three different machines and also arranged from fastest to slowest CPU clock
+// speeds. The parallelism goes past the maximum of 150 concurrent compiles
+// for the last machine.
 
-++++
-<div id="parallel_build_forge_08" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_forge_08',
-{
-    text: 'Jobs: 8',
-    subtext: 'Forge: Intel Xeon W-2145 CPU @ 3.70GHz (8 physical cores / 16 w HT)'
-},
-include::data/forge-150-j008.json[]
-);
-</script>
-++++
+// ++++
+// <div id="parallel_build_forge_08" style="height: 400px;"></div>
+// <script type="text/javascript">
+// create_parallel_build_chart(
+// 'parallel_build_forge_08',
+// {
+//     text: 'Jobs: 8',
+//     subtext: 'Forge: Intel Xeon W-2145 CPU @ 3.70GHz (8 physical cores / 16 w HT)'
+// },
+// include::data/forge-150-j008.json[]
+// );
+// </script>
+// ++++
 
-++++
-<div id="parallel_build_forge_16" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_forge_16',
-{
-    text: 'Jobs: 16',
-    subtext: 'Forge: Intel Xeon W-2145 CPU @ 3.70GHz (8 physical cores / 16 w HT)'
-},
-include::data/forge-150-j016.json[]
-);
-</script>
-++++
+// ++++
+// <div id="parallel_build_forge_16" style="height: 400px;"></div>
+// <script type="text/javascript">
+// create_parallel_build_chart(
+// 'parallel_build_forge_16',
+// {
+//     text: 'Jobs: 16',
+//     subtext: 'Forge: Intel Xeon W-2145 CPU @ 3.70GHz (8 physical cores / 16 w HT)'
+// },
+// include::data/forge-150-j016.json[]
+// );
+// </script>
+// ++++
 
-++++
-<div id="parallel_build_adora_20" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_adora_20',
-{
-    text: 'Jobs: 20',
-    subtext: 'Adora: Intel Xeon CPU E5-2640 v4 @ 2.40GHz(Dual Socket 20 physical cores / 40 w HT)'
-},
-include::data/adora-150-j020.json[]
-);
-</script>
-++++
+// ++++
+// <div id="parallel_build_adora_20" style="height: 400px;"></div>
+// <script type="text/javascript">
+// create_parallel_build_chart(
+// 'parallel_build_adora_20',
+// {
+//     text: 'Jobs: 20',
+//     subtext: 'Adora: Intel Xeon CPU E5-2640 v4 @ 2.40GHz(Dual Socket 20 physical cores / 40 w HT)'
+// },
+// include::data/adora-150-j020.json[]
+// );
+// </script>
+// ++++
 
-++++
-<div id="parallel_build_adora_40" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_adora_40',
-{
-    text: 'Jobs: 40',
-    subtext: 'Adora: Intel Xeon CPU E5-2640 v4 @ 2.40GHz(Dual Socket 20 physical cores / 40 w HT)'
-},
-include::data/adora-150-j040.json[]
-);
-</script>
-++++
+// ++++
+// <div id="parallel_build_adora_40" style="height: 400px;"></div>
+// <script type="text/javascript">
+// create_parallel_build_chart(
+// 'parallel_build_adora_40',
+// {
+//     text: 'Jobs: 40',
+//     subtext: 'Adora: Intel Xeon CPU E5-2640 v4 @ 2.40GHz(Dual Socket 20 physical cores / 40 w HT)'
+// },
+// include::data/adora-150-j040.json[]
+// );
+// </script>
+// ++++
 
-NOTE: This Camelot machine is not ideally suited for this type of workload.
-But shows the effect of going slow but wide on parallelism. Which is a
-common tradeoff in play with distributed builds.
+// NOTE: This Camelot machine is not ideally suited for this type of workload.
+// But shows the effect of going slow but wide on parallelism. Which is a
+// common tradeoff in play with distributed builds.
 
-++++
-<div id="parallel_build_camelot_68" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_camelot_68',
-{
-    text: 'Jobs: 68',
-    subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
-},
-include::data/camelot-150-j068.json[]
-);
-</script>
-++++
+// ++++
+// <div id="parallel_build_camelot_68" style="height: 400px;"></div>
+// <script type="text/javascript">
+// create_parallel_build_chart(
+// 'parallel_build_camelot_68',
+// {
+//     text: 'Jobs: 68',
+//     subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
+// },
+// include::data/camelot-150-j068.json[]
+// );
+// </script>
+// ++++
 
-++++
-<div id="parallel_build_camelot_136" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_camelot_136',
-{
-    text: 'Jobs: 136',
-    subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
-},
-include::data/camelot-150-j136.json[]
-);
-</script>
-++++
+// ++++
+// <div id="parallel_build_camelot_136" style="height: 400px;"></div>
+// <script type="text/javascript">
+// create_parallel_build_chart(
+// 'parallel_build_camelot_136',
+// {
+//     text: 'Jobs: 136',
+//     subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
+// },
+// include::data/camelot-150-j136.json[]
+// );
+// </script>
+// ++++
 
-++++
-<div id="parallel_build_camelot_272" style="height: 400px;"></div>
-<script type="text/javascript">
-var parallel_build_chart = create_parallel_build_chart(
-'parallel_build_camelot_272',
-{
-    text: 'Jobs: 272',
-    subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
-},
-include::data/camelot-150-j272.json[]
-);
-</script>
-++++
+// ++++
+// <div id="parallel_build_camelot_272" style="height: 400px;"></div>
+// <script type="text/javascript">
+// create_parallel_build_chart(
+// 'parallel_build_camelot_272',
+// {
+//     text: 'Jobs: 272',
+//     subtext: 'Camelot: Intel Xeon Phi CPU 7250 @ 1.40GHz (68 physical cores / 272 with 4 way SMT)'
+// },
+// include::data/camelot-150-j272.json[]
+// );
+// </script>
+// ++++
 
 
 == Conclusion
 
-With the limitations of the capabilities of the compiler one can only conclude
-that modular builds could be advantageous at lower parallelism levels
+With the limitations of the capabilities of current compilers one can only
+conclude that modular builds could be advantageous at lower parallelism levels
 environments. In other words, that modules currently do not scale in the same
 ways as traditional compilation.
 
@@ -528,8 +588,12 @@ proposal in GCC. And the citizens of the Internet and more specifically the
 contributors to StackOverflow for the hints that made it possible to
 decipher how to get the GCC svn checkout to build in OSX.
 
-Special thanks to Robert Maynard for taking the time and resources to build
-GCC and run the test script on various machine configurations and job counts.
+// Special thanks to Robert Maynard for taking the time and resources to build
+// GCC and run the test script on various machine configurations and job counts.
+
+And many thanks to Mathias Stearn for the logic on how to compile the Clang
+modules. And Ninja generation for comparison in a different build system
+context.
 
 == References
 
