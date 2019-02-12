@@ -116,6 +116,9 @@ class Executor(object):
         self.__processes__ = int(processes)
         self.__pool__ = None
         self.__lock__ = threading.Lock()
+        self.__t0__ = None
+        self.__command_stats__ = []
+        self.__thread_index__ = 0
 
     def copy(self):
         o = Executor(self.__processes__)
@@ -133,17 +136,29 @@ class Executor(object):
     def run(self):
         self.__pool__ = [threading.Thread(
             target=self.next_command) for x in range(self.__processes__)]
+        self.__t0__ = default_timer()
         for t in self.__pool__:
             t.start()
         for t in self.__pool__:
             t.join()
 
     def next_command(self):
-        c = self.pick_command()
-        while c:
-            c[1][0](*c[1][1:])
-            self.complete_command(c[0])
+        self.__lock__.acquire()
+        index = self.__thread_index__
+        self.__thread_index__ += 1
+        self.__lock__.release()
+        while len(self.__command__) > 0:
             c = self.pick_command()
+            if c:
+                t0 = default_timer()-self.__t0__
+                c[1][0](*c[1][1:])
+                t1 = default_timer()-self.__t0__
+                self.__lock__.acquire()
+                self.__command_stats__.append([index, t0, t1, t1-t0])
+                self.__lock__.release()
+                self.complete_command(c[0])
+            else:
+                sleep(0.001)
 
     def pick_command(self):
         result = None
@@ -162,6 +177,10 @@ class Executor(object):
         for k in self.__command_deps__.keys():
             self.__command_deps__[k].discard(id)
         self.__lock__.release()
+
+    @property
+    def command_stats(self):
+        return self.__command_stats__
 
 
 class Test(Main):
@@ -223,6 +242,8 @@ class Test(Main):
         parser.add_argument(
             '--use-ninja', default=False, action='store_true',
             help='Use ninja rather than python to run the compiler (currently clang only)')
+        parser.add_argument(
+            '--exec-stats')
 
     def __run__(self):
         self.dir = os.getcwd()
@@ -275,7 +296,8 @@ class Test(Main):
                     elif run_x:
                         run_dag_jobs = []
                         run_time = []
-                        for _ in range(self.args.run_samples):
+                        for sample_i in range(self.args.run_samples):
+                            run_executor = x.copy()
                             t0 = default_timer()
                             if self.args.use_ninja:
                                 with PushDir(os.path.dirname(x[0][0])) as dir:
@@ -285,8 +307,11 @@ class Test(Main):
                                                          '-j', str(self.args.jobs)])
                                 run_dag_jobs.append(math.nan)  # ???
                             else:
-                                run_dag_jobs.append(run_x(x.copy()))
+                                run_dag_jobs.append(run_x(run_executor))
                             run_time.append(default_timer()-t0)
+                            if self.args.exec_stats:
+                                self.__save_data__(
+                                    self.args.exec_stats, run_executor.command_stats)
                         run_time.sort()
                         if len(run_time) >= 5:
                             run_time = run_time[1:-2]
