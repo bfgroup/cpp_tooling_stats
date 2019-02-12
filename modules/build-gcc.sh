@@ -78,6 +78,7 @@ cd __build__
 --program-suffix=-mxx \
 --enable-checking=release \
 --enable-languages=c,c++ \
+--disable-multilib
 
 make -j ${JOBS}
 make install-strip

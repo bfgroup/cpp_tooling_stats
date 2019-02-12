@@ -222,7 +222,7 @@ class Test(Main):
             help='Which toolset to run tests for. Can be one or more of: gcc, clang.')
         parser.add_argument(
             '--use-ninja', default=False, action='store_true',
-            help='Use ninja rather than python to run the compiler (currently clang only)')
+            help='Use ninja rather than python to run the compiler')
 
     def __run__(self):
         self.dir = os.getcwd()
@@ -278,7 +278,7 @@ class Test(Main):
                         for _ in range(self.args.run_samples):
                             t0 = default_timer()
                             if self.args.use_ninja:
-                                with PushDir(os.path.dirname(x[0][0])) as dir:
+                                with PushDir(self.args.dir) as dir:
                                     self.__check_call__(['ninja',
                                                          '-f', os.path.join(
                                                              dir, 'build.ninja'),
@@ -407,17 +407,28 @@ class Test(Main):
             ninja_file = open(os.path.join(dir, 'build.ninja'), 'w')
             ninja = ninja_syntax.Writer(ninja_file, width=100)
 
-            ninja.variable(
-                'CXXFLAGS', '-fmodules-ts -c -std=c++2a -O0 "@{dir}/mm.txt"'.format(dir=dir))
-            ninja.rule('CXX',
-                       command='"{cxx}" $CXXFLAGS $in -o $out'.format(
-                           cxx=self.cxx),
-                       description='CXX $out')
+            if self.args.use_std:
+                ninja.variable('STDLIB', '-I "%s"' % os.path.join(self.dir, '..', 'std-modules'))
+            ninja.variable('CXXFLAGS', '-fmodules-ts -c -std=c++2a -O0 $STDLIB')
 
-            ninja.rule('CXX-BMI',
-                       command='"{cxx}" $CXXFLAGS -x c++-module --precompile $in -o $out'.format(
-                           cxx=self.cxx),
-                       description='CXX-BMI $out')
+            if self.args.toolset == 'gcc':
+                two_phase = False
+                ninja.variable('MAPFLAG', '-fmodule-mapper="{dir}/mm.csv"'.format(dir=dir))
+                ninja.rule('CXX',
+                           command='"{cxx}" $CXXFLAGS $MAPFLAG -x c++ $in -o $out'.format(
+                               cxx=self.cxx),
+                           description='CXX $out')
+            elif self.args.toolset == 'clang':
+                two_phase = True
+                ninja.variable('MAPFLAG', '"@{dir}/mm.txt"'.format(dir=dir))
+                ninja.rule('CXX',
+                           command='"{cxx}" $CXXFLAGS $MAPFLAG $in -o $out'.format(
+                               cxx=self.cxx),
+                           description='CXX $out')
+                ninja.rule('CXX-BMI',
+                           command='"{cxx}" $CXXFLAGS $MAPFLAG -x c++-module --precompile $in -o $out'.format(
+                               cxx=self.cxx),
+                           description='CXX-BMI $out')
 
             dag_deps = {}
             for dag_level in dag_levels:
@@ -447,18 +458,21 @@ class Test(Main):
                 module_mxx = os.path.join(dir, module_id + '.mpp')
                 module_obj = os.path.join(dir, module_id + '.o')
                 module_bmi = None
-                if self.args.toolset == 'gcc':
-                    module_bmi = os.path.join(dir, module_id + '.gcm')
-                elif self.args.toolset == 'clang':
-                    module_bmi = os.path.join(dir, module_id + '.pcm')
                 module_deps = ['m%s' % (n) for n in dag_deps[n]]
                 module_source = self.__make_module_source__(
                     module_id, module_deps)
-                module_map[module_id] = module_bmi
-                ninja.build(module_obj, 'CXX', module_bmi)
+                if self.args.toolset == 'gcc':
+                    module_bmi = os.path.join(dir, module_id + '.gcm')
+                    ninja.build(module_obj, 'CXX', module_mxx,
+                                implicit_outputs=module_bmi,
+                                implicit=[os.path.join(dir, dep + '.gcm') for dep in module_deps])
+                elif self.args.toolset == 'clang':
+                    module_bmi = os.path.join(dir, module_id + '.pcm')
+                    ninja.build(module_obj, 'CXX', module_bmi)
+                    ninja.build(module_bmi, 'CXX-BMI', module_mxx,
+                                implicit=[os.path.join(dir, dep + '.pcm') for dep in module_deps])
                 ninja.default(module_obj)
-                ninja.build(module_bmi, 'CXX-BMI', module_mxx,
-                            implicit=[os.path.join(dir, dep + '.pcm') for dep in module_deps])
+                module_map[module_id] = module_bmi
                 if self.args.debug:
                     print('FILE: %s' % (module_mxx))
                     print(module_source)
