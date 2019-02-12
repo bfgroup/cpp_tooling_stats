@@ -278,7 +278,7 @@ class Test(Main):
                         for _ in range(self.args.run_samples):
                             t0 = default_timer()
                             if self.args.use_ninja:
-                                with PushDir(os.path.dirname(x[0][0])) as dir:
+                                with PushDir(self.args.dir) as dir:
                                     self.__check_call__(['ninja',
                                                          '-f', os.path.join(
                                                              dir, 'build.ninja'),
