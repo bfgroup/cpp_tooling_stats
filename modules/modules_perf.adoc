@@ -31,6 +31,7 @@ include::std.css[]
 </style>
 <script src="echarts.min.js"></script>
 <script src="build_chart.js"></script>
+<script src="build_stats.js"></script>
 ++++
 endif::[]
 
@@ -239,7 +240,7 @@ in the executor. But this is stable through the lifetime of each test rune,
 and hence can be ignored as we only care about relative performance.
 
 ++++
-<div style="page-break-before: always"></div>
+<div style="page-break-before: always;"></div>
 ++++
 
 === Results
@@ -267,24 +268,19 @@ include::data/coqui-150-j008-clang.json[]
 ++++
 
 First looking at the GCC performance, the solid lines, we can see that
-modular compiles have a consistent advantage over all DAG depths. Although
-the modular compiles rise slightly at the start they flatten out for most
-of the DAG depths. Whereas the non-modular compiles initially rise
-quickly and then a bit slower. But they still rise over time as more
-source code is consumed from the deepening header inclusions. This
-certainly looks really good for a modular future.
+modular compiles have a consistent advantage over all DAG depths. The
+modular compiles rise slowly, and steadily, as the DAG depths increase.
+Whereas the non-modular compiles initially rise quickly and then a bit slower.
+But they still rise over time as more source code is consumed from the
+deepening header inclusions. This certainly looks really good for a modular
+future.
 
-Now, lets look at Clang, the dashed lines, like GCC it starts out
-performing along the same scale of performance at lower DAG depths. But,
-alarmingly, at the 1/3 point it jumps in time to instead, surprisingly,
-follow the GCC non-modular compile performance. While at the same time
-the non-modular Clang compiles perform considerably better, but still
-linear. Another observation worth noting is that at the lower DAG depths
-GCC performs slightly better than Clang. This is likely from Clang test
-doing two compile invocations to generate the equivalent BMI and object
-data.
+Now, lets look at Clang, the dashed lines, like GCC it follows a similar
+almost linear increase. And similarly the non-modular Clang compiles perform
+like the GCC non-modular builds, rising quickly and then slowly. An observation
+worth noting is that Clang performs slightly better than GCC over the
+increasing DAG depths.
 
-Even with the bad news of Clang at high DAG depths this looks promising.
 Both compilers perform very well at the not high DAG depths and scale
 well as DAG depth increases. But this is at what is considered low
 parallelism levels. Even phones are approaching this level of performance.
@@ -293,10 +289,11 @@ Lets now look at higher levels of parallelism with a machine that has only
 slightly lower CPU core speed but is capable of executing up 128 threads
 with its 32 physical cores. The first sample set is a base line comparison
 at 8 parallel jobs. As we can see it performs comparably with the above
-results. The one big difference is that now GCC non-modular performs better
-than the Clang non-modular builds.
+results. The one big difference is that now GCC performs better than the
+Clang builds.
 
 ++++
+<div style="page-break-before: always;"></div>
 <div id="parallel_build_gcc135_8" style="height: 400px;"></div>
 <script type="text/javascript">
 create_parallel_build_chart_multi(
@@ -340,7 +337,13 @@ include::data/gcc135-150-j016-clang.json[]
 Immediately we can see that the non-modular builds roughly half in clock time
 matching the doubling of the available parallelism. And are now very close to
 the performance of GCC modular builds. What is striking is that the modular
-builds don't substantially change from the 8 parallel job case. 
+builds don't substantially change from the 8 parallel job case. And while
+before modular builds where faster at all depths now the non-modular builds
+have caught up at the highest depth of this test.
+
+++++
+<div style="page-break-before: always;"></div>
+++++
 
 ++++
 <div id="parallel_build_gcc135_32" style="height: 400px;"></div>
@@ -382,8 +385,11 @@ include::data/gcc135-150-j048-clang.json[]
 
 As we can see the increasing number of parallel jobs keeps improving the
 performance of the non-modular builds while the modular builds are
-consistent. By now the non-modular builds are always faster at DAG depths
-43 onward.
+consistent.
+
+++++
+<div style="page-break-before: always;"></div>
+++++
 
 ++++
 <div id="parallel_build_gcc135_64" style="height: 400px;"></div>
@@ -443,6 +449,10 @@ include::data/gcc135-150-j096-clang.json[]
 ++++
 
 ++++
+<div style="page-break-before: always;"></div>
+++++
+
+++++
 <div id="parallel_build_gcc135_128" style="height: 400px;"></div>
 <script type="text/javascript">
 create_parallel_build_chart_multi(
@@ -461,8 +471,8 @@ include::data/gcc135-150-j128-clang.json[]
 </script>
 ++++
 
-We've now reached the point where non-modular builds are faster at all DAG
-depths higher than 22. And while the modular builds have stayed the same in
+We've now reached the point where non-modular builds are faster at most DAG
+depths. And while the modular builds have stayed the same in
 the face of increasing parallelism, the non-modular builds have gained ground
 at each step.
 
@@ -573,12 +583,118 @@ at each step.
 // </script>
 // ++++
 
+++++
+<div style="page-break-before: always;"></div>
+++++
+
+=== Execution
+
+Looking at wall clock performance isn't complete without also looking at the
+execution distribution also. Here we look at the timing chart of compilation
+tasks performed during one build cycle, i.e. when tasks ran and on which
+job thread. In this case we chose a DAG depth of 20 as that is likely a
+reasonably common structure for larger projects. But we do use the maximum
+local parallelism of 128 jobs to highlight the possible differences between
+modular and non-modular builds.
+
+++++
+<div id="exec_chart_modules_d020" style="height: 850px;"></div>
+<script type="text/javascript">
+create_execution_chart(
+'exec_chart_modules_d020',
+{
+    text: 'Execution, Modular, Depth 20',
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
+},
+include::data/gcc135-150-j128-d020-clang-stat-modules.json[]
+);
+</script>
+++++
+
+We can see above one key observation, there is a lot of unused CPU time during
+the overall build execution. This would be due to tasks needing to wait for
+the needed dependent tasks to complete. Below is the equivalent non-modular
+build.
+
+++++
+<div style="page-break-before: always;"></div>
+++++
+
+++++
+<div id="exec_chart_headers_d020" style="height: 850px;"></div>
+<script type="text/javascript">
+create_execution_chart(
+'exec_chart_headers_d020',
+{
+    text: 'Execution, Non-Modular, Depth 20',
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
+},
+include::data/gcc135-150-j128-d020-clang-stat-headers.json[]
+);
+</script>
+++++
+
+As expected there is more parallel CPU being used in this case as nothing
+needs to wait for dependencies. But we also notice that the individual tasks
+tasks take considerably longer than the modular compile tasks.
+
+NOTE: The initial delays in each job thread is due to the limited build
+simulation. There's a single mutex locked data queue that all the job
+threads pull from. Which creates a race for all of them to get in line
+for jobs.
+
+To extrapolate lets also look at the same build except at a DAG depth of
+100.
+
+++++
+<div style="page-break-before: always;"></div>
+++++
+
+++++
+<div id="exec_chart_modules_d100" style="height: 850px;"></div>
+<script type="text/javascript">
+create_execution_chart(
+'exec_chart_modules_d100',
+{
+    text: 'Execution, Modular, Depth 100',
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
+},
+include::data/gcc135-150-j128-d100-clang-stat-modules.json[]
+);
+</script>
+++++
+
+++++
+<div style="page-break-before: always;"></div>
+++++
+
+++++
+<div id="exec_chart_headers_d100" style="height: 850px;"></div>
+<script type="text/javascript">
+create_execution_chart(
+'exec_chart_headers_d100',
+{
+    text: 'Execution, Non-Modular, Depth 100',
+    subtext: 'GCC135: POWER9, altivec supported 2.2 (pvr 004e 1202) @ 2.166GHz (2 CPU, 32 cores, 128 threads)'
+},
+include::data/gcc135-150-j128-d100-clang-stat-headers.json[]
+);
+</script>
+++++
+
+We can now see how the modular builds delay the execution of tasks as the
+dependency chain grows longer.
+
+++++
+<div style="page-break-before: always;"></div>
+++++
 
 == Conclusion
 
 With the limitations of the capabilities of current compilers one can only
-conclude that modular builds could be advantageous at lower parallelism levels
-environments. In other words, that modules currently do not scale in the same
+conclude that modular builds are very advantageous at lower parallelism levels
+environments. But that it's unclear if they are an advantage in highly parallel
+build environments. In other words, that modules currently do not scale in the same
 ways as traditional compilation.
 
 == Acknowledgements

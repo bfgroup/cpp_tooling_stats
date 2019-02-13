@@ -136,9 +136,12 @@ class Executor(object):
     def run(self):
         self.__pool__ = [threading.Thread(
             target=self.next_command) for x in range(self.__processes__)]
+        # self.__lock__.acquire()
         self.__t0__ = default_timer()
         for t in self.__pool__:
             t.start()
+        self.__t0__ = default_timer()
+        # self.__lock__.release()
         for t in self.__pool__:
             t.join()
 
