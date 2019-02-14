@@ -32,4 +32,4 @@ This is a collection of measurements for building source that uses the
 proposed {CPP} modules feature. So far these are presented as formal
 papers submitted for information to WG21 {CPP} standards group.
 
-* _Are modules fast?_ Rene Rivera -- link:modules/modules_perf_P1441R0.html[P1441R0]
+* _Are modules fast?_ Rene Rivera -- link:modules/modules_perf_D1441R1.html[D1441R1] -- link:modules/modules_perf_P1441R0.html[P1441R0]
