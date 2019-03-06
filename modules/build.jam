@@ -7,5 +7,5 @@
 
 using asciidoctor ;
 
-html modules_perf_D1441R1.html : modules_perf.adoc ;
-install html : modules_perf_D1441R1.html : <location>. ;
+html modules_perf_P1441R1.html : modules_perf.adoc ;
+install html : modules_perf_P1441R1.html : <location>. ;
